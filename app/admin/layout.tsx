@@ -35,12 +35,6 @@ export default async function AdminLayout({
               <h2 className="text-xs sm:text-sm font-semibold">Admin</h2>
               <div className="flex gap-2 sm:gap-4 text-xs sm:text-sm">
                 <a
-                  href="/admin/dashboard"
-                  className="hover:text-blue-200 font-medium transition"
-                >
-                  Dashboard
-                </a>
-                <a
                   href="/admin/plans"
                   className="hover:text-blue-200 font-medium transition"
                 >
