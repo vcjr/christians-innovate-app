@@ -25,13 +25,13 @@ export default async function MeetingsPage() {
   }
 
   // Fetch all meetings
-  const { data: meetings, error: meetingsError } = await supabase
+  const { data: meetings } = await supabase
     .from('meetings')
     .select('*')
     .order('meeting_date', { ascending: false })
 
   // Fetch attendance with user profiles for all meetings
-  const { data: attendanceData, error: attendanceError } = await supabase
+  const { data: attendanceData } = await supabase
     .from('meeting_attendance')
     .select(`
       meeting_id,

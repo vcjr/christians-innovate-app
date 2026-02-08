@@ -1,11 +1,12 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import Image from 'next/image'
-import { LayoutDashboard, Shield, LogOut, Users, Rocket, FolderOpen } from 'lucide-react'
+import { LayoutDashboard, Shield, LogOut, Users, Rocket, FolderOpen, Target } from 'lucide-react'
 import { signOut } from './actions'
 import { MobileMenu } from './mobile-menu'
 import { UserProfileDropdown } from './user-profile-dropdown'
 import { SignOutButton } from '@/components/auth/SignOutButton'
+import { NotificationBell } from './notification-bell'
 
 export async function NavigationBar() {
   const supabase = await createClient()
@@ -30,6 +31,20 @@ export async function NavigationBar() {
     .select('full_name, avatar_url')
     .eq('user_id', user.id)
     .single()
+
+  // Fetch notifications
+  const { data: notifications } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(20)
+
+  const { count: unreadCount } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('is_read', false)
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-40">
@@ -82,6 +97,14 @@ export async function NavigationBar() {
                 Resources
               </Link>
 
+              <Link
+                href="/accountability"
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium transition"
+              >
+                <Target className="h-4 w-4" />
+                Accountability
+              </Link>
+
               {isAdmin && (
                 <Link
                   href="/admin/dashboard"
@@ -95,7 +118,11 @@ export async function NavigationBar() {
           </div>
 
           {/* Desktop User Info */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3">
+            <NotificationBell
+              notifications={notifications || []}
+              unreadCount={unreadCount || 0}
+            />
             <UserProfileDropdown
               fullName={userProfile?.full_name || null}
               avatarUrl={userProfile?.avatar_url || null}

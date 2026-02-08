@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe } from 'lucide-react'
+import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe, UserPlus, Clock, Loader2 } from 'lucide-react'
+import { sendGroupInvitation } from '@/app/accountability/actions'
 
 interface UserProfile {
   id: string
@@ -14,6 +16,7 @@ interface UserProfile {
   interests: string[]
   looking_for_business_partner: boolean
   looking_for_accountability_partner: boolean
+  accountability_group_id: string | null
   linkedin_url: string | null
   facebook_url: string | null
   twitter_url: string | null
@@ -23,9 +26,12 @@ interface UserProfile {
 interface DirectoryClientProps {
   profiles: UserProfile[]
   currentUserId: string
+  userGroupId: string | null
+  isGroupCreator: boolean
+  pendingInvitedUserIds: string[]
 }
 
-function getInitials(name: string | null, userId: string): string {
+function getInitials(name: string | null): string {
   if (!name) return 'U'
   const parts = name.trim().split(/\s+/)
   if (parts.length >= 2) {
@@ -34,9 +40,32 @@ function getInitials(name: string | null, userId: string): string {
   return name.substring(0, 2).toUpperCase()
 }
 
-export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProps) {
+export function DirectoryClient({ profiles, currentUserId, isGroupCreator, pendingInvitedUserIds }: DirectoryClientProps) {
+  const router = useRouter()
   const [expandedSkills, setExpandedSkills] = useState<Set<string>>(new Set())
   const [expandedInterests, setExpandedInterests] = useState<Set<string>>(new Set())
+  const [invitingUserId, setInvitingUserId] = useState<string | null>(null)
+  const [invitedUserIds, setInvitedUserIds] = useState<Set<string>>(new Set(pendingInvitedUserIds))
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  const handleInvite = async (userId: string, userName: string) => {
+    setInvitingUserId(userId)
+    try {
+      const result = await sendGroupInvitation(userId)
+      if (result.error) {
+        setToastMessage({ text: result.error, type: 'error' })
+      } else {
+        setInvitedUserIds(prev => new Set(prev).add(userId))
+        setToastMessage({ text: `Invitation sent to ${userName || 'member'}!`, type: 'success' })
+        router.refresh()
+      }
+    } catch {
+      setToastMessage({ text: 'Failed to send invitation', type: 'error' })
+    } finally {
+      setInvitingUserId(null)
+      setTimeout(() => setToastMessage(null), 3000)
+    }
+  }
 
   const toggleSkillsExpanded = (profileId: string) => {
     setExpandedSkills(prev => {
@@ -139,7 +168,7 @@ export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProp
                     />
                   ) : (
                     <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-xl font-semibold border-2 border-gray-100">
-                      {getInitials(profile.full_name, profile.user_id)}
+                      {getInitials(profile.full_name)}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
@@ -262,6 +291,37 @@ export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProp
                     </div>
                   )
                 })()}
+
+                {/* Invite to Group Button */}
+                {isGroupCreator && profile.user_id !== currentUserId && !profile.accountability_group_id && (
+                  <div className="pt-3 border-t border-gray-100 mt-3">
+                    {invitedUserIds.has(profile.user_id) ? (
+                      <div className="flex items-center gap-2 text-amber-600 text-sm font-medium">
+                        <Clock className="h-4 w-4" />
+                        Invitation pending
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleInvite(profile.user_id, profile.full_name || 'Member')}
+                        disabled={invitingUserId === profile.user_id}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {invitingUserId === profile.user_id ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</>
+                        ) : (
+                          <><UserPlus className="h-4 w-4" /> Invite to Group</>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Already in a group indicator */}
+                {isGroupCreator && profile.user_id !== currentUserId && profile.accountability_group_id && (
+                  <div className="pt-3 border-t border-gray-100 mt-3">
+                    <p className="text-xs text-gray-400 text-center">Already in a group</p>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -276,6 +336,14 @@ export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProp
           </div>
         )}
       </div>
+
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${toastMessage.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          }`}>
+          {toastMessage.text}
+        </div>
+      )}
     </div>
   )
 }
