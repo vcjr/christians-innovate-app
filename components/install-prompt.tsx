@@ -67,7 +67,7 @@ export default function InstallPrompt() {
       const dismissedData = localStorage.getItem('pwa-install-dismissed')
       let shouldShow = true
 
-      if (dismissedData && !isInstalled) {
+      if (dismissedData && !isStandalone) {
         try {
           const dismissedTimestamp = parseInt(dismissedData, 10)
           const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000
@@ -85,7 +85,7 @@ export default function InstallPrompt() {
         }
       }
 
-      if (shouldShow && !isInstalled) {
+      if (shouldShow && !isStandalone) {
         setShowPrompt(true)
       }
     }

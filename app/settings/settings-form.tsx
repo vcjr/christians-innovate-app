@@ -850,14 +850,13 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
             )
           })}
         </div>
-      </form>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
           <p className="text-sm text-blue-900">
             <strong>Note:</strong> Each translation is approximately {TRANSLATION_FILE_SIZE}. Downloads may take 15-60 seconds on slower connections. Downloaded translations will be available for reading even when you&apos;re offline.
           </p>
         </div>
-      </div>
+      </form>
     </>
   )
 }

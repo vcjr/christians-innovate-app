@@ -214,10 +214,13 @@ async function fetchSingleReference(
       )
 
       if (cachedVerses) {
-        return cachedVerses.map((v) => ({
-          ...v,
-          text: parseBibleText(v.text, translation),
-        }))
+        return {
+          verses: cachedVerses.map((v) => ({
+            ...v,
+            text: parseBibleText(v.text, translation),
+          })),
+          source: 'cache',
+        }
       }
     } else {
       const cachedVerses = await fetchVersesFromCache(
@@ -229,10 +232,13 @@ async function fetchSingleReference(
       )
 
       if (cachedVerses) {
-        return cachedVerses.map((v) => ({
-          ...v,
-          text: parseBibleText(v.text, translation),
-        }))
+        return {
+          verses: cachedVerses.map((v) => ({
+            ...v,
+            text: parseBibleText(v.text, translation),
+          })),
+          source: 'cache',
+        }
       }
     }
   }

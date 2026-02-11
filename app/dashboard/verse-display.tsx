@@ -1,12 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getBibleVersesIndividually } from './verse-actions'
 import { getUserPreferredTranslation, saveUserPreferredTranslation } from './user-preferences-actions'
 import type { TranslationKey } from '@/utils/bible-api'
-import type { IndividualVerse, BibleFetchResult } from '@/utils/bible-api-client'
+import type { IndividualVerse } from '@/utils/bible-api-client'
 import { fetchBibleVersesIndividually } from '@/utils/bible-api-client'
-import { parseBibleText } from '@/utils/bible-text-parser'
 import { BookOpen, Loader2, ChevronDown, List, AlignLeft, WifiOff } from 'lucide-react'
 
 interface VerseDisplayProps {
@@ -27,7 +25,6 @@ interface VerseByVerseViewProps {
 }
 
 interface ParagraphViewProps {
-  reference: string
   verses: IndividualVerse[]
   selectedVersion: TranslationKey
 }
@@ -128,7 +125,7 @@ function VerseByVerseView({ reference, verses, selectedVersion }: VerseByVerseVi
   )
 }
 
-function ParagraphView({ reference, verses, selectedVersion }: ParagraphViewProps) {
+function ParagraphView({ verses, selectedVersion }: ParagraphViewProps) {
   if (verses.length === 0) {
     return (
       <div className="py-4 px-4 sm:px-6 bg-blue-50 border-l-4 border-blue-500 rounded">
@@ -409,7 +406,6 @@ export function VerseDisplay({
         />
       ) : (
         <ParagraphView
-          reference={reference}
           verses={individualVerses}
           selectedVersion={selectedVersion}
         />

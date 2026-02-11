@@ -25,7 +25,7 @@ interface DirectoryClientProps {
   currentUserId: string
 }
 
-function getInitials(name: string | null, userId: string): string {
+function getInitials(name: string | null): string {
   if (!name) return 'U'
   const parts = name.trim().split(/\s+/)
   if (parts.length >= 2) {
@@ -139,7 +139,7 @@ export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProp
                     />
                   ) : (
                     <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-xl font-semibold border-2 border-gray-100">
-                      {getInitials(profile.full_name, profile.user_id)}
+                      {getInitials(profile.full_name)}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
