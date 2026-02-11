@@ -32,7 +32,7 @@ export default withPWA({
     runtimeCaching: [
       // Cache Supabase Storage (avatars)
       {
-        urlPattern: new RegExp(`^https://${supabaseHostname.replace(/\./g, '\\.')}/storage/v1/object/public/.*`, 'i'),
+        urlPattern: new RegExp(`^https://${supabaseHostname.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/storage/v1/object/public/.*`, 'i'),
         handler: 'CacheFirst',
         options: {
           cacheName: 'supabase-storage',
