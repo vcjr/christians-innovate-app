@@ -1,15 +1,20 @@
 import type { NextConfig } from "next";
 import withPWA from '@ducanh2912/next-pwa';
 
+// Get Supabase URL from environment variable with fallback
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ttsvwbeuiqbidhcxufnx.supabase.co'
+const supabaseHostname = new URL(supabaseUrl).hostname
+
 const nextConfig: NextConfig = {
-  // Empty turbopack config to silence webpack/turbopack warning
-  // PWA plugin uses webpack, this allows it to work with Next.js 16
+  // WORKAROUND: Empty turbopack config to silence webpack/turbopack warning.
+  // The PWA plugin currently uses webpack; this enables it to work with Next.js 16.
+  // TODO: Revisit this once the PWA plugin has native Turbopack support, as this is technical debt.
   turbopack: {},
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'ttsvwbeuiqbidhcxufnx.supabase.co',
+        hostname: supabaseHostname,
         port: '',
         pathname: '/storage/v1/object/public/**',
       },
@@ -27,7 +32,7 @@ export default withPWA({
     runtimeCaching: [
       // Cache Supabase Storage (avatars)
       {
-        urlPattern: /^https:\/\/ttsvwbeuiqbidhcxufnx\.supabase\.co\/storage\/v1\/object\/public\/.*/i,
+        urlPattern: new RegExp(`^https://${supabaseHostname.replace(/\./g, '\\.')}/storage/v1/object/public/.*`, 'i'),
         handler: 'CacheFirst',
         options: {
           cacheName: 'supabase-storage',

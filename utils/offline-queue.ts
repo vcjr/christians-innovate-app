@@ -1,14 +1,44 @@
 // Offline queue management using IndexedDB
 // Stores user actions when offline and syncs when online
+//
+// NOTE: The sync API endpoints referenced in this file (/api/sync/*) are not yet implemented.
+// This is a stub implementation that will fail to sync until those endpoints are created.
 
 const DB_NAME = 'ChristiansInnovateOfflineQueue'
 const DB_VERSION = 1
 const QUEUE_STORE = 'actionQueue'
 
+// Type definitions for different action data structures
+export interface PrayerPostData {
+  title: string
+  content: string
+  category?: string
+}
+
+export interface CommentData {
+  postId: string
+  content: string
+  parentId?: string
+}
+
+export interface ReadingProgressData {
+  planId: string
+  dayNumber: number
+  completed: boolean
+}
+
+export interface VerseNoteData {
+  reference: string
+  note: string
+  isPrivate: boolean
+}
+
+export type ActionData = PrayerPostData | CommentData | ReadingProgressData | VerseNoteData
+
 export interface QueuedAction {
   id?: number
   type: 'prayer_post' | 'comment' | 'reading_progress' | 'verse_note'
-  data: any
+  data: ActionData
   timestamp: number
   retries: number
   status: 'pending' | 'processing' | 'failed'
@@ -45,7 +75,7 @@ function openDB(): Promise<IDBDatabase> {
  */
 export async function queueAction(
   type: QueuedAction['type'],
-  data: any
+  data: ActionData
 ): Promise<{ success: boolean; id?: number; error?: string }> {
   try {
     const db = await openDB()
@@ -249,7 +279,7 @@ export async function processQueue(): Promise<{
 /**
  * Sync a prayer post to the server
  */
-async function syncPrayerPost(data: any): Promise<boolean> {
+async function syncPrayerPost(data: ActionData): Promise<boolean> {
   try {
     const response = await fetch('/api/sync/prayer-post', {
       method: 'POST',
@@ -266,7 +296,7 @@ async function syncPrayerPost(data: any): Promise<boolean> {
 /**
  * Sync a comment to the server
  */
-async function syncComment(data: any): Promise<boolean> {
+async function syncComment(data: ActionData): Promise<boolean> {
   try {
     const response = await fetch('/api/sync/comment', {
       method: 'POST',
@@ -283,7 +313,7 @@ async function syncComment(data: any): Promise<boolean> {
 /**
  * Sync reading progress to the server
  */
-async function syncReadingProgress(data: any): Promise<boolean> {
+async function syncReadingProgress(data: ActionData): Promise<boolean> {
   try {
     const response = await fetch('/api/sync/reading-progress', {
       method: 'POST',
@@ -300,7 +330,7 @@ async function syncReadingProgress(data: any): Promise<boolean> {
 /**
  * Sync a verse note to the server
  */
-async function syncVerseNote(data: any): Promise<boolean> {
+async function syncVerseNote(data: ActionData): Promise<boolean> {
   try {
     const response = await fetch('/api/sync/verse-note', {
       method: 'POST',

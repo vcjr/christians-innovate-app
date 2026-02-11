@@ -784,41 +784,75 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
           </div>
         )}
 
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Changes
-              </>
-            )}
-          </button>
+        {/* Translation Downloads */}
+        <div className="space-y-2 mb-4">
+          {Object.entries(BIBLE_TRANSLATIONS).map(([key]) => {
+            const isCached = cachedTranslations.includes(key)
+            const isDownloading = downloadingTranslation === key
+
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition"
+              >
+                <div className="flex items-center gap-3">
+                  {isCached ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
+                  )}
+                  <div>
+                    <p className="font-medium text-gray-900">{key}</p>
+                    <p className="text-sm text-gray-500">{translationNames[key]}</p>
+                    {!isCached && (
+                      <p className="text-xs text-gray-400">~5-6 MB</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {isCached ? (
+                    <>
+                      <span className="text-xs text-green-600 font-medium">Downloaded</span>
+                      <button
+                        onClick={() => handleRemoveTranslation(key)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        title="Remove from offline storage"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => handleDownloadTranslation(key)}
+                      disabled={isDownloading}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      {isDownloading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="hidden sm:inline">Downloading...</span>
+                          <span className="sm:hidden">...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4" />
+                          <span className="hidden sm:inline">Download</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </form>
 
-      {/* Sign Out Section */}
-      <div className="mt-8 pt-6 border-t border-gray-200">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Account Actions</h2>
-          <p className="text-sm text-gray-600 mb-4">Sign out of your account on this device</p>
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </button>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-900">
+            <strong>Note:</strong> Each translation is approximately 5-6 MB. Downloads may take 15-60 seconds on slower connections. Downloaded translations will be available for reading even when you&apos;re offline.
+          </p>
         </div>
       </div>
     </>
