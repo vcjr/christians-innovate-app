@@ -196,7 +196,9 @@ async function fetchSingleReference(
         }
       }
     } catch (error) {
-      // Swallow online fetch errors and proceed to cache fallback
+      // Swallow online fetch errors (e.g., network failures, 404s, timeouts)
+      // and proceed to cache fallback. This ensures offline functionality works
+      // seamlessly when the online database is unavailable.
     }
   }
 

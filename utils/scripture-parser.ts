@@ -17,11 +17,14 @@ export interface ParsedReference {
  * - "John 3:16"
  * - "Genesis 1:1-3"
  * - "Genesis 1-4"
- * - "Day 2: John 3"
- * - "Week 1: Genesis 1:1-3"
+ * - "Day 2: John 3" (prefix with number)
+ * - "Week 1: Genesis 1:1-3" (prefix with number)
+ * 
+ * Note: Prefixes must be followed by a number (e.g., "Day 2:", not "Day:")
  */
 export function parseScriptureReference(reference: string): ParsedReference | null {
-  // Remove common prefixes like "Day 2:", "Week 1:", "Chapter:", etc.
+  // Remove common prefixes like "Day 2:", "Week 1:", "Chapter 3:", etc.
+  // Note: This only matches prefixes followed by a number
   let cleaned = reference.trim()
   const prefixMatch = cleaned.match(/^(?:Day|Week|Chapter|Lesson|Part)\s+\d+:\s*(.+)$/i)
   if (prefixMatch) {

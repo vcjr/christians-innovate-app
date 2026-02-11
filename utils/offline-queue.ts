@@ -33,6 +33,7 @@ export interface VerseNoteData {
   isPrivate: boolean
 }
 
+// Union type for all possible action data
 export type ActionData = PrayerPostData | CommentData | ReadingProgressData | VerseNoteData
 
 export interface QueuedAction {
@@ -232,16 +233,16 @@ export async function processQueue(): Promise<{
       let success = false
       switch (action.type) {
         case 'prayer_post':
-          success = await syncPrayerPost(action.data)
+          success = await syncPrayerPost(action.data as PrayerPostData)
           break
         case 'comment':
-          success = await syncComment(action.data)
+          success = await syncComment(action.data as CommentData)
           break
         case 'reading_progress':
-          success = await syncReadingProgress(action.data)
+          success = await syncReadingProgress(action.data as ReadingProgressData)
           break
         case 'verse_note':
-          success = await syncVerseNote(action.data)
+          success = await syncVerseNote(action.data as VerseNoteData)
           break
       }
 
@@ -279,7 +280,7 @@ export async function processQueue(): Promise<{
 /**
  * Sync a prayer post to the server
  */
-async function syncPrayerPost(data: ActionData): Promise<boolean> {
+async function syncPrayerPost(data: PrayerPostData): Promise<boolean> {
   try {
     const response = await fetch('/api/sync/prayer-post', {
       method: 'POST',
@@ -296,7 +297,7 @@ async function syncPrayerPost(data: ActionData): Promise<boolean> {
 /**
  * Sync a comment to the server
  */
-async function syncComment(data: ActionData): Promise<boolean> {
+async function syncComment(data: CommentData): Promise<boolean> {
   try {
     const response = await fetch('/api/sync/comment', {
       method: 'POST',
@@ -313,7 +314,7 @@ async function syncComment(data: ActionData): Promise<boolean> {
 /**
  * Sync reading progress to the server
  */
-async function syncReadingProgress(data: ActionData): Promise<boolean> {
+async function syncReadingProgress(data: ReadingProgressData): Promise<boolean> {
   try {
     const response = await fetch('/api/sync/reading-progress', {
       method: 'POST',
@@ -330,7 +331,7 @@ async function syncReadingProgress(data: ActionData): Promise<boolean> {
 /**
  * Sync a verse note to the server
  */
-async function syncVerseNote(data: ActionData): Promise<boolean> {
+async function syncVerseNote(data: VerseNoteData): Promise<boolean> {
   try {
     const response = await fetch('/api/sync/verse-note', {
       method: 'POST',

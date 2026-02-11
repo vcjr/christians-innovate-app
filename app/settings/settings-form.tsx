@@ -80,7 +80,10 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const supabase = createClient()
   const router = useRouter()
 
-  // Load cached translations and install prompt state on mount
+  // Constants
+  const TRANSLATION_FILE_SIZE = '~5-6 MB'
+
+  // Load cached translations on mount
   useEffect(() => {
     async function loadOfflineData() {
       const cached = await getCachedTranslations()
@@ -805,7 +808,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
                     <p className="font-medium text-gray-900">{key}</p>
                     <p className="text-sm text-gray-500">{translationNames[key]}</p>
                     {!isCached && (
-                      <p className="text-xs text-gray-400">~5-6 MB</p>
+                      <p className="text-xs text-gray-400">{TRANSLATION_FILE_SIZE}</p>
                     )}
                   </div>
                 </div>
@@ -851,7 +854,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-900">
-            <strong>Note:</strong> Each translation is approximately 5-6 MB. Downloads may take 15-60 seconds on slower connections. Downloaded translations will be available for reading even when you&apos;re offline.
+            <strong>Note:</strong> Each translation is approximately {TRANSLATION_FILE_SIZE}. Downloads may take 15-60 seconds on slower connections. Downloaded translations will be available for reading even when you&apos;re offline.
           </p>
         </div>
       </div>
