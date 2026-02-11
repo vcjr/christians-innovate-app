@@ -63,6 +63,28 @@ export default function InstallPrompt() {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
 
+      // Check if user has dismissed the prompt within the last 30 days
+      const dismissedData = localStorage.getItem('pwa-install-dismissed')
+      let shouldShow = true
+
+      if (dismissedData && !isStandalone) {
+        try {
+          const dismissedTimestamp = parseInt(dismissedData, 10)
+          const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000
+          const timeSinceDismissal = Date.now() - dismissedTimestamp
+
+          if (timeSinceDismissal < thirtyDaysInMs) {
+            shouldShow = false
+          } else {
+            // Clear expired dismissal
+            localStorage.removeItem('pwa-install-dismissed')
+          }
+        } catch {
+          // Invalid data, clear it
+          localStorage.removeItem('pwa-install-dismissed')
+        }
+      }
+
       if (shouldShow && !isStandalone) {
         setShowPrompt(true)
       }
@@ -91,7 +113,7 @@ export default function InstallPrompt() {
 
   const handleDismiss = () => {
     setShowPrompt(false)
-    // Store timestamp instead of boolean
+    // Store current timestamp instead of just 'true'
     localStorage.setItem('pwa-install-dismissed', Date.now().toString())
   }
 

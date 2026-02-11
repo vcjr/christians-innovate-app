@@ -12,6 +12,7 @@ import {
   isOnline,
   isTranslationCached,
 } from './bible-offline'
+import { parseScriptureReference } from './scripture-parser'
 
 export interface IndividualVerse {
   verseNumber: number
@@ -98,8 +99,6 @@ async function fetchSingleReference(
   const isCached = await isTranslationCached(translation)
 
   if (isCached) {
-    console.log('Using cached translation for:', reference)
-
     let cachedVerses: IndividualVerse[] | null = null
 
     if (parsed.chapterEnd) {
@@ -130,9 +129,6 @@ async function fetchSingleReference(
         source: 'cache',
       }
     }
-
-    // If cache fails, fall through to online
-    console.log('Cache lookup failed, trying online...')
   }
 
   // Try online (either no cache or cache failed)
@@ -200,13 +196,14 @@ async function fetchSingleReference(
         }
       }
     } catch (error) {
-      console.log('Online fetch failed:', error)
+      // Swallow online fetch errors (e.g., network failures, 404s, timeouts)
+      // and proceed to cache fallback. This ensures offline functionality works
+      // seamlessly when the online database is unavailable.
     }
   }
 
   // Last resort: try cache if we haven't already
   if (!isCached) {
-    console.log('Trying cache as final fallback for:', reference)
 
     if (parsed.chapterEnd) {
       const cachedVerses = await fetchChapterRangeFromCache(
@@ -217,10 +214,13 @@ async function fetchSingleReference(
       )
 
       if (cachedVerses) {
-        return cachedVerses.map((v) => ({
-          ...v,
-          text: parseBibleText(v.text, translation),
-        }))
+        return {
+          verses: cachedVerses.map((v) => ({
+            ...v,
+            text: parseBibleText(v.text, translation),
+          })),
+          source: 'cache',
+        }
       }
     } else {
       const cachedVerses = await fetchVersesFromCache(
@@ -232,59 +232,16 @@ async function fetchSingleReference(
       )
 
       if (cachedVerses) {
-        return cachedVerses.map((v) => ({
-          ...v,
-          text: parseBibleText(v.text, translation),
-        }))
+        return {
+          verses: cachedVerses.map((v) => ({
+            ...v,
+            text: parseBibleText(v.text, translation),
+          })),
+          source: 'cache',
+        }
       }
     }
   }
 
   return null
-}
-
-/**
- * Parse a scripture reference string into components
- */
-function parseScriptureReference(reference: string): {
-  book: string
-  chapter: number
-  verseStart: number | null
-  verseEnd: number | null
-  chapterEnd: number | null
-} | null {
-  // Remove any prefix like "Day 2: " or similar
-  let cleaned = reference.trim()
-  const prefixMatch = cleaned.match(/^[^:]+:\s*(.+)$/)
-  if (prefixMatch && /^Day\s+\d+:/i.test(cleaned)) {
-    cleaned = prefixMatch[1].trim()
-  }
-
-  // Clean up trailing dashes or special chars
-  cleaned = cleaned.replace(/[-–\s]+$/, '')
-
-  // Pattern: "Book Chapter:Verse-Verse" or "Book Chapter-Chapter" or "Book Chapter:Verse" or "Book Chapter"
-  // Supports both hyphen (-) and en-dash (–)
-  const pattern =
-    /^(.+?)\s+(\d+)(?:\s*[-–]\s*(\d+))?(?::(\d+)(?:\s*[-–]\s*(\d+))?)?$/
-
-  const match = cleaned.match(pattern)
-  if (!match) {
-    console.error('Failed to parse reference:', { original: reference, cleaned })
-    return null
-  }
-
-  const book = match[1].trim()
-  const chapter = parseInt(match[2], 10)
-  const chapterEnd = match[3] ? parseInt(match[3], 10) : null
-  const verseStart = match[4] ? parseInt(match[4], 10) : null
-  const verseEnd = match[5] ? parseInt(match[5], 10) : null
-
-  return {
-    book,
-    chapter,
-    verseStart,
-    verseEnd,
-    chapterEnd,
-  }
 }

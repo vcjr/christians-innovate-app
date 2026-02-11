@@ -26,22 +26,24 @@ export default async function PreferencesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <Link
-          href="/settings"
-          className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Settings
-        </Link>
+    <>
+      {/* Back button */}
+      <Link
+        href="/dashboard"
+        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6 font-medium"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Dashboard
+      </Link>
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          Newsletter Preferences
-        </h1>
-
-        <PreferencesForm user={user} profile={profile} />
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Newsletter Preferences</h1>
+        <p className="text-gray-600 mt-2">Manage your newsletter subscriptions</p>
       </div>
-    </div>
+
+      {/* Preferences Form */}
+      <PreferencesForm user={user} profile={profile} />
+    </>
   )
 }

@@ -4,6 +4,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { parseBibleText } from './bible-text-parser'
 import { BIBLE_TRANSLATIONS, type TranslationKey } from './bible-constants'
+import { parseScriptureReference } from './scripture-parser'
 
 // Re-export for backwards compatibility
 export { BIBLE_TRANSLATIONS, type TranslationKey }
@@ -170,61 +171,5 @@ async function fetchSingleReference(
   }
 }
 
-/**
- * Parse a scripture reference to extract book, chapter, and verses
- */
-export function parseScriptureReference(reference: string): {
-  book: string
-  chapter: number
-  chapterEnd?: number
-  verseStart: number | null
-  verseEnd: number | null
-} | null {
-  // Normalize different dash types to regular hyphen
-  const normalizedRef = reference.replace(/[–—−]/g, '-')
-
-  // Try to parse with verse numbers: "John 3:16" or "Genesis 1:1-3"
-  let match = normalizedRef.match(/^([A-Za-z0-9\s]+)\s+(\d+):(\d+)(?:-(\d+))?$/)
-
-  if (match) {
-    const [, book, chapter, verseStart, verseEnd] = match
-
-    return {
-      book: book.trim(),
-      chapter: parseInt(chapter),
-      verseStart: parseInt(verseStart),
-      verseEnd: verseEnd ? parseInt(verseEnd) : null,
-    }
-  }
-
-  // Try to parse chapter range: "Genesis 1 - 4" or "Genesis 1-4"
-  match = normalizedRef.match(/^([A-Za-z0-9\s]+)\s+(\d+)\s*-\s*(\d+)$/)
-
-  if (match) {
-    const [, book, chapterStart, chapterEnd] = match
-
-    return {
-      book: book.trim(),
-      chapter: parseInt(chapterStart),
-      chapterEnd: parseInt(chapterEnd),
-      verseStart: null,
-      verseEnd: null,
-    }
-  }
-
-  // Try to parse chapter only: "Genesis 1"
-  match = normalizedRef.match(/^([A-Za-z0-9\s]+)\s+(\d+)$/)
-
-  if (match) {
-    const [, book, chapter] = match
-
-    return {
-      book: book.trim(),
-      chapter: parseInt(chapter),
-      verseStart: null,
-      verseEnd: null,
-    }
-  }
-
-  return null
-}
+// Export parseScriptureReference from shared utility for backwards compatibility
+export { parseScriptureReference } from './scripture-parser'
