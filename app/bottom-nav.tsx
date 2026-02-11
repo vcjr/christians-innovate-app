@@ -56,7 +56,7 @@ export function BottomNav({ isAdmin, avatarUrl, userId }: BottomNavProps) {
   const displayItems = navItems.slice(0, 5)
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-inset-bottom">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-[env(safe-area-inset-bottom)]">
       <div className="flex justify-around items-center h-16 px-2">
         {displayItems.map((item) => {
           const Icon = item.icon

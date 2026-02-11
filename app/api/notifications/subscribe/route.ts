@@ -1,6 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 
+interface PushSubscription {
+  endpoint: string
+  expirationTime?: number | null
+  keys: {
+    p256dh: string
+    auth: string
+  }
+}
+
+function validatePushSubscription(subscription: unknown): subscription is PushSubscription {
+  if (!subscription || typeof subscription !== 'object') {
+    return false
+  }
+
+  const sub = subscription as Record<string, unknown>
+
+  // Validate endpoint
+  if (typeof sub.endpoint !== 'string' || !sub.endpoint.trim()) {
+    return false
+  }
+
+  // Validate keys object
+  if (!sub.keys || typeof sub.keys !== 'object') {
+    return false
+  }
+
+  const keys = sub.keys as Record<string, unknown>
+
+  // Validate required cryptographic keys
+  if (typeof keys.p256dh !== 'string' || !keys.p256dh.trim()) {
+    return false
+  }
+
+  if (typeof keys.auth !== 'string' || !keys.auth.trim()) {
+    return false
+  }
+
+  return true
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -9,6 +49,14 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Validate subscription structure
+    if (!validatePushSubscription(subscription)) {
+      return NextResponse.json(
+        { error: 'Invalid subscription format. Missing required fields: endpoint, keys.p256dh, or keys.auth' },
+        { status: 400 }
+      )
     }
 
     // Store subscription in database

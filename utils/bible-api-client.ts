@@ -20,13 +20,19 @@ export interface IndividualVerse {
   text: string
 }
 
+export interface BibleFetchResult {
+  verses: IndividualVerse[]
+  reference: string
+  source: 'cache' | 'network'
+}
+
 /**
  * Fetch verses individually with verse numbers (client-side with offline fallback)
  */
 export async function fetchBibleVersesIndividually(
   translation: TranslationKey,
   reference: string
-): Promise<{ verses: IndividualVerse[]; reference: string } | null> {
+): Promise<BibleFetchResult | null> {
   const translationCode = BIBLE_TRANSLATIONS[translation]
 
   // Split by commas to handle multiple references
@@ -37,11 +43,15 @@ export async function fetchBibleVersesIndividually(
 
   if (references.length > 1) {
     const allVerses: IndividualVerse[] = []
+    let usedCache = false
 
     for (const ref of references) {
       const result = await fetchSingleReference(translationCode, ref, translation)
       if (result) {
-        allVerses.push(...result)
+        allVerses.push(...result.verses)
+        if (result.source === 'cache') {
+          usedCache = true
+        }
       }
     }
 
@@ -52,18 +62,20 @@ export async function fetchBibleVersesIndividually(
     return {
       verses: allVerses,
       reference,
+      source: usedCache ? 'cache' : 'network',
     }
   }
 
   // Single reference
-  const verses = await fetchSingleReference(translationCode, reference, translation)
-  if (!verses) {
+  const result = await fetchSingleReference(translationCode, reference, translation)
+  if (!result) {
     return null
   }
 
   return {
-    verses,
+    verses: result.verses,
     reference,
+    source: result.source,
   }
 }
 
@@ -74,7 +86,7 @@ async function fetchSingleReference(
   translationCode: string,
   reference: string,
   translation: TranslationKey
-): Promise<IndividualVerse[] | null> {
+): Promise<{ verses: IndividualVerse[]; source: 'cache' | 'network' } | null> {
   // Parse the scripture reference
   const parsed = parseScriptureReference(reference)
   if (!parsed) {
@@ -110,10 +122,13 @@ async function fetchSingleReference(
     }
 
     if (cachedVerses) {
-      return cachedVerses.map((v) => ({
-        ...v,
-        text: parseBibleText(v.text, translation),
-      }))
+      return {
+        verses: cachedVerses.map((v) => ({
+          ...v,
+          text: parseBibleText(v.text, translation),
+        })),
+        source: 'cache',
+      }
     }
 
     // If cache fails, fall through to online
@@ -139,12 +154,15 @@ async function fetchSingleReference(
           .order('verse_start', { ascending: true })
 
         if (!error && verses && verses.length > 0) {
-          return verses.map((v) => ({
-            chapterNumber: v.chapter,
-            verseNumber: v.verse_start,
-            bookName: parsed.book,
-            text: parseBibleText(v.text, translation),
-          }))
+          return {
+            verses: verses.map((v) => ({
+              chapterNumber: v.chapter,
+              verseNumber: v.verse_start,
+              bookName: parsed.book,
+              text: parseBibleText(v.text, translation),
+            })),
+            source: 'network',
+          }
         }
       } else {
         // Single chapter or verse range
@@ -170,12 +188,15 @@ async function fetchSingleReference(
         const { data: verses, error } = await query
 
         if (!error && verses && verses.length > 0) {
-          return verses.map((v) => ({
-            verseNumber: v.verse_start,
-            chapterNumber: v.chapter,
-            bookName: parsed.book,
-            text: parseBibleText(v.text, translation),
-          }))
+          return {
+            verses: verses.map((v) => ({
+              verseNumber: v.verse_start,
+              chapterNumber: v.chapter,
+              bookName: parsed.book,
+              text: parseBibleText(v.text, translation),
+            })),
+            source: 'network',
+          }
         }
       }
     } catch (error) {

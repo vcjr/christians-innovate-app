@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { getBibleVersesIndividually } from './verse-actions'
 import { getUserPreferredTranslation, saveUserPreferredTranslation } from './user-preferences-actions'
 import type { TranslationKey } from '@/utils/bible-api'
-import type { IndividualVerse } from '@/utils/bible-api-client'
+import type { IndividualVerse, BibleFetchResult } from '@/utils/bible-api-client'
 import { fetchBibleVersesIndividually } from '@/utils/bible-api-client'
 import { parseBibleText } from '@/utils/bible-text-parser'
 import { BookOpen, Loader2, ChevronDown, List, AlignLeft, WifiOff } from 'lucide-react'
@@ -262,7 +262,8 @@ export function VerseDisplay({
 
         if (individualResult) {
           setIndividualVerses(individualResult.verses)
-          setIsOffline(!navigator.onLine)
+          // Set offline based on whether data came from cache
+          setIsOffline(individualResult.source === 'cache')
         } else {
           setIndividualVerses([])
           setError(true)
