@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react'
 import { getBibleVersesIndividually } from './verse-actions'
 import { getUserPreferredTranslation, saveUserPreferredTranslation } from './user-preferences-actions'
-import type { TranslationKey, IndividualVerse } from '@/utils/bible-api'
+import type { TranslationKey } from '@/utils/bible-api'
+import type { IndividualVerse } from '@/utils/bible-api-client'
+import { fetchBibleVersesIndividually } from '@/utils/bible-api-client'
 import { parseBibleText } from '@/utils/bible-text-parser'
-import { BookOpen, Loader2, ChevronDown, List, AlignLeft } from 'lucide-react'
+import { BookOpen, Loader2, ChevronDown, List, AlignLeft, WifiOff } from 'lucide-react'
 
 interface VerseDisplayProps {
   reference: string
@@ -228,6 +230,7 @@ export function VerseDisplay({
   const [error, setError] = useState(false)
   const [selectedVersion, setSelectedVersion] = useState<TranslationKey>(initialTranslation)
   const [viewMode, setViewMode] = useState<'paragraph' | 'verse-by-verse'>(defaultViewMode)
+  const [isOffline, setIsOffline] = useState(false)
 
   // Load user's preferred translation on mount
   useEffect(() => {
@@ -254,11 +257,12 @@ export function VerseDisplay({
       setError(false)
 
       try {
-        // Fetch verses for the entire reference (supports comma-separated references)
-        const individualResult = await getBibleVersesIndividually(reference, selectedVersion)
+        // Use client-side fetch with offline fallback
+        const individualResult = await fetchBibleVersesIndividually(selectedVersion, reference)
 
         if (individualResult) {
           setIndividualVerses(individualResult.verses)
+          setIsOffline(!navigator.onLine)
         } else {
           setIndividualVerses([])
           setError(true)
@@ -307,9 +311,17 @@ export function VerseDisplay({
             <p className="text-sm sm:text-base text-gray-800 leading-relaxed mb-2">
               {displayText}
             </p>
-            <p className="text-xs sm:text-sm text-blue-700 font-medium">
-              {reference} ({selectedVersion})
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs sm:text-sm text-blue-700 font-medium">
+                {reference} ({selectedVersion})
+              </p>
+              {isOffline && (
+                <span className="flex items-center gap-1 text-xs text-gray-500">
+                  <WifiOff className="h-3 w-3" />
+                  Offline
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -349,6 +361,13 @@ export function VerseDisplay({
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 pointer-events-none" />
             </div>
+          </div>
+        )}
+
+        {isOffline && (
+          <div className="flex items-center gap-2 ml-auto text-sm text-gray-600 bg-gray-100 px-3 py-1.5 rounded-lg">
+            <WifiOff className="h-4 w-4" />
+            <span>Offline Mode</span>
           </div>
         )}
 

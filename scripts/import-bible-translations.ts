@@ -122,7 +122,7 @@ async function importTranslation(filePath: string) {
 }
 
 async function main() {
-  const translationsDir = path.join(process.cwd(), 'translations');
+  const translationsDir = path.join(process.cwd(), 'public', 'translations');
 
   console.log('🔍 Scanning translations directory...');
 
@@ -132,7 +132,7 @@ async function main() {
     .map(f => path.join(translationsDir, f));
 
   if (files.length === 0) {
-    console.log('⚠️  No JSON files found in /translations folder');
+    console.log('⚠️  No JSON files found in /public/translations folder');
     return;
   }
 

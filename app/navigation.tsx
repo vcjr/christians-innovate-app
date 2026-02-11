@@ -3,7 +3,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { LayoutDashboard, Shield, LogOut, Users, Rocket } from 'lucide-react'
 import { signOut } from './actions'
-import { MobileMenu } from './mobile-menu'
 import { UserProfileDropdown } from './user-profile-dropdown'
 
 export async function NavigationBar() {
@@ -31,7 +30,7 @@ export async function NavigationBar() {
     .single()
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-40 hidden md:block">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo and Nav Links */}
@@ -103,9 +102,13 @@ export async function NavigationBar() {
             </form>
           </div>
 
-          {/* Mobile Menu */}
+          {/* Mobile - Show user profile only */}
           <div className="md:hidden">
-            <MobileMenu userEmail={user.email || ''} isAdmin={isAdmin} />
+            <UserProfileDropdown
+              fullName={userProfile?.full_name || null}
+              avatarUrl={userProfile?.avatar_url || null}
+              userId={user.id}
+            />
           </div>
         </div>
       </div>

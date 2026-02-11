@@ -1,11 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { User as SupabaseUser } from '@supabase/supabase-js'
-import { Camera, Save, Loader2, User } from 'lucide-react'
+import { Camera, Save, Loader2, Download, Trash2, CheckCircle, HardDrive } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import {
+  getCachedTranslations,
+  downloadTranslationForOffline,
+  removeCachedTranslation,
+  getStorageInfo,
+} from '@/utils/bible-offline'
+import { BIBLE_TRANSLATIONS, type TranslationKey } from '@/utils/bible-constants'
 
 interface Profile {
   id: string
@@ -53,8 +60,83 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // PWA offline state
+  const [cachedTranslations, setCachedTranslations] = useState<string[]>([])
+  const [downloadingTranslation, setDownloadingTranslation] = useState<string | null>(null)
+  const [storageInfo, setStorageInfo] = useState<{
+    usage: number
+    quota: number
+    percentUsed: number
+  } | null>(null)
+
   const supabase = createClient()
   const router = useRouter()
+
+  // Load cached translations on mount
+  useEffect(() => {
+    async function loadOfflineData() {
+      const cached = await getCachedTranslations()
+      setCachedTranslations(cached)
+
+      const storage = await getStorageInfo()
+      setStorageInfo(storage)
+    }
+    loadOfflineData()
+  }, [])
+
+  const translationNames: Record<string, string> = {
+    KJV: 'King James Version',
+    NKJV: 'New King James Version',
+    ESV: 'English Standard Version',
+    NIV: 'New International Version',
+    NLT: 'New Living Translation',
+    NASB: 'New American Standard Bible',
+    MSG: 'The Message',
+  }
+
+  async function handleDownloadTranslation(translation: string) {
+    setDownloadingTranslation(translation)
+    const result = await downloadTranslationForOffline(translation as TranslationKey)
+
+    if (result.success) {
+      const cached = await getCachedTranslations()
+      setCachedTranslations(cached)
+
+      const storage = await getStorageInfo()
+      setStorageInfo(storage)
+
+      setMessage({ type: 'success', text: `${translation} downloaded for offline use` })
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Failed to download translation' })
+    }
+
+    setDownloadingTranslation(null)
+  }
+
+  async function handleRemoveTranslation(translation: string) {
+    const result = await removeCachedTranslation(translation as TranslationKey)
+
+    if (result.success) {
+      const cached = await getCachedTranslations()
+      setCachedTranslations(cached)
+
+      const storage = await getStorageInfo()
+      setStorageInfo(storage)
+
+      setMessage({ type: 'success', text: `${translation} removed from offline storage` })
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Failed to remove translation' })
+    }
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  }
 
   function getInitials(name: string): string {
     if (!name) return user.email?.[0]?.toUpperCase() || 'U'
@@ -386,7 +468,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
         {/* Partnership Preferences */}
         <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Looking For</h2>
-          <p className="text-sm text-gray-600 mb-4">Let others know what type of partnerships you're interested in</p>
+          <p className="text-sm text-gray-600 mb-4">Let others know what type of partnerships you&apos;re interested in</p>
 
           <div className="space-y-4">
             <label className="flex items-start gap-3 cursor-pointer group">
@@ -398,7 +480,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
               />
               <div className="flex-1">
                 <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Business Partners</p>
-                <p className="text-sm text-gray-500">I'm open to business collaboration and partnership opportunities</p>
+                <p className="text-sm text-gray-500">I&apos;m open to business collaboration and partnership opportunities</p>
               </div>
             </label>
 
@@ -411,7 +493,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
               />
               <div className="flex-1">
                 <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Accountability Partners</p>
-                <p className="text-sm text-gray-500">I'm looking for someone to help keep me accountable in my faith and goals</p>
+                <p className="text-sm text-gray-500">I&apos;m looking for someone to help keep me accountable in my faith and goals</p>
               </div>
             </label>
           </div>
@@ -482,10 +564,109 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
         </div>
       </div>
 
+      {/* Offline Downloads Section */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">Offline Bible Access</h2>
+          <p className="text-sm text-gray-600 mb-4">Download Bible translations for offline reading</p>
+        </div>
+
+        {/* Storage Info */}
+        {storageInfo && (
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <HardDrive className="h-4 w-4 text-gray-600" />
+                <span className="text-sm font-medium text-gray-900">Storage Used</span>
+              </div>
+              <span className="text-sm text-gray-600">
+                {formatBytes(storageInfo.usage)} of {formatBytes(storageInfo.quota)}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full ${storageInfo.percentUsed > 80 ? 'bg-red-600' : storageInfo.percentUsed > 50 ? 'bg-yellow-600' : 'bg-blue-600'
+                  }`}
+                style={{ width: `${Math.min(storageInfo.percentUsed, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {storageInfo.percentUsed.toFixed(1)}% used
+            </p>
+          </div>
+        )}
+
+        {/* Translation Downloads */}
+        <div className="space-y-2 mb-4">
+          {Object.entries(BIBLE_TRANSLATIONS).map(([key]) => {
+            const isCached = cachedTranslations.includes(key)
+            const isDownloading = downloadingTranslation === key
+
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition"
+              >
+                <div className="flex items-center gap-3">
+                  {isCached ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
+                  )}
+                  <div>
+                    <p className="font-medium text-gray-900">{key}</p>
+                    <p className="text-sm text-gray-500">{translationNames[key]}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {isCached ? (
+                    <>
+                      <span className="text-xs text-green-600 font-medium">Downloaded</span>
+                      <button
+                        onClick={() => handleRemoveTranslation(key)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        title="Remove from offline storage"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => handleDownloadTranslation(key)}
+                      disabled={isDownloading}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      {isDownloading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Downloading...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4" />
+                          Download
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-900">
+            <strong>Note:</strong> Each translation is approximately 5-6 MB. Downloaded translations will be available for reading even when you&apos;re offline.
+          </p>
+        </div>
+      </div>
+
       {/* Newsletter Preferences */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Newsletter Preferences</h2>
-        <p className="text-sm text-gray-600 mb-4">Choose which updates you'd like to receive from us</p>
+        <p className="text-sm text-gray-600 mb-4">Choose which updates you&apos;d like to receive from us</p>
 
         <div className="space-y-4">
           <label className="flex items-start gap-3 cursor-pointer group">
