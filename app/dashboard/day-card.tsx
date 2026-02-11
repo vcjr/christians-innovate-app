@@ -68,9 +68,9 @@ export function DayCard({ day, isCompleted }: DayCardProps) {
       <div className="border-t border-gray-200">
         <VerseDisplay
           reference={day.scripture_reference}
-          translation="KJV"
           truncate={true}
           maxLength={120}
+          usePreferredTranslation={true}
         />
       </div>
     </div>

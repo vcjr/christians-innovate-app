@@ -17,11 +17,11 @@ export default async function AppSettingsPage() {
     <>
       {/* Back button */}
       <Link
-        href="/settings"
+        href="/dashboard"
         className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6 font-medium"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Settings
+        Back to Dashboard
       </Link>
 
       {/* Header */}
