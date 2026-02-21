@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { User as SupabaseUser } from '@supabase/supabase-js'
-import { Camera, Save, Loader2, User } from 'lucide-react'
+import { Camera, Save, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
@@ -24,6 +24,10 @@ interface Profile {
   facebook_url: string | null
   twitter_url: string | null
   website_url: string | null
+  email_notifications_enabled: boolean
+  daily_reminder_enabled: boolean
+  meeting_reminder_enabled: boolean
+  weekly_digest_enabled: boolean
   created_at: string
   updated_at: string
 }
@@ -48,6 +52,10 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const [facebookUrl, setFacebookUrl] = useState(profile.facebook_url || '')
   const [twitterUrl, setTwitterUrl] = useState(profile.twitter_url || '')
   const [websiteUrl, setWebsiteUrl] = useState(profile.website_url || '')
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(profile.email_notifications_enabled ?? true)
+  const [dailyReminderEnabled, setDailyReminderEnabled] = useState(profile.daily_reminder_enabled ?? true)
+  const [meetingReminderEnabled, setMeetingReminderEnabled] = useState(profile.meeting_reminder_enabled ?? true)
+  const [weeklyDigestEnabled, setWeeklyDigestEnabled] = useState(profile.weekly_digest_enabled ?? true)
   const [skillInput, setSkillInput] = useState('')
   const [interestInput, setInterestInput] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -136,6 +144,10 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
           facebook_url: facebookUrl.trim() || null,
           twitter_url: twitterUrl.trim() || null,
           website_url: websiteUrl.trim() || null,
+          email_notifications_enabled: emailNotificationsEnabled,
+          daily_reminder_enabled: dailyReminderEnabled,
+          meeting_reminder_enabled: meetingReminderEnabled,
+          weekly_digest_enabled: weeklyDigestEnabled,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id)
@@ -478,6 +490,80 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
               placeholder="https://yourwebsite.com"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Email Notifications */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Email Notifications</h2>
+        <p className="text-sm text-gray-600 mb-4">Manage your email notification preferences</p>
+
+        <div className="space-y-4">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={emailNotificationsEnabled}
+              onChange={(e) => {
+                const enabled = e.target.checked
+                setEmailNotificationsEnabled(enabled)
+                // If turning off master switch, disable all sub-options
+                if (!enabled) {
+                  setDailyReminderEnabled(false)
+                  setMeetingReminderEnabled(false)
+                  setWeeklyDigestEnabled(false)
+                }
+              }}
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <p className="font-semibold text-gray-900 group-hover:text-blue-600 transition">Enable Email Notifications</p>
+              <p className="text-sm text-gray-500">Master toggle for all email notifications from Christians Innovate</p>
+            </div>
+          </label>
+
+          <div className={`ml-7 pl-4 border-l-2 ${emailNotificationsEnabled ? 'border-blue-500' : 'border-gray-300 opacity-50'} space-y-4`}>
+            <label className={`flex items-start gap-3 ${emailNotificationsEnabled ? 'cursor-pointer' : 'cursor-not-allowed'} group`}>
+              <input
+                type="checkbox"
+                checked={dailyReminderEnabled && emailNotificationsEnabled}
+                onChange={(e) => setDailyReminderEnabled(e.target.checked)}
+                disabled={!emailNotificationsEnabled}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Daily Reading Reminders</p>
+                <p className="text-sm text-gray-500">Get daily reminders for your Bible reading plan (sent at 8am UTC)</p>
+              </div>
+            </label>
+
+            <label className={`flex items-start gap-3 ${emailNotificationsEnabled ? 'cursor-pointer' : 'cursor-not-allowed'} group`}>
+              <input
+                type="checkbox"
+                checked={meetingReminderEnabled && emailNotificationsEnabled}
+                onChange={(e) => setMeetingReminderEnabled(e.target.checked)}
+                disabled={!emailNotificationsEnabled}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Meeting Reminders</p>
+                <p className="text-sm text-gray-500">Receive reminders about upcoming community meetings (sent day before)</p>
+              </div>
+            </label>
+
+            <label className={`flex items-start gap-3 ${emailNotificationsEnabled ? 'cursor-pointer' : 'cursor-not-allowed'} group`}>
+              <input
+                type="checkbox"
+                checked={weeklyDigestEnabled && emailNotificationsEnabled}
+                onChange={(e) => setWeeklyDigestEnabled(e.target.checked)}
+                disabled={!emailNotificationsEnabled}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Weekly Digest</p>
+                <p className="text-sm text-gray-500">Weekly summary of community activity and upcoming events (sent Mondays)</p>
+              </div>
+            </label>
           </div>
         </div>
       </div>
