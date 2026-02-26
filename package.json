@@ -12,6 +12,9 @@
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
+    "@youversion/platform-core": "^1.15.1",
+    "@youversion/platform-react-hooks": "^1.15.1",
+    "@youversion/platform-react-ui": "^1.15.1",
     "lucide-react": "^0.562.0",
     "next": "16.1.5",
     "react": "19.2.3",
