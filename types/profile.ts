@@ -19,5 +19,6 @@ export interface UserProfile {
   facebook_url: string | null;
   twitter_url: string | null;
   website_url: string | null;
+  has_completed_onboarding: boolean;
   updated_at: string;
 }
