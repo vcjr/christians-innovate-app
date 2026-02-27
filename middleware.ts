@@ -59,13 +59,24 @@ export async function middleware(request: NextRequest) {
   // Refresh the session if it exists/is expired
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Define routes that require authentication. Add more paths here as your app grows.
-  const protectedRoutes = ['/onboarding']
-  const isProtectedRoute = protectedRoutes.some(path => request.nextUrl.pathname.startsWith(path))
+  const pathname = request.nextUrl.pathname;
+  
+  // 1. Define Route Categories
+  const isPublicRoute = ['/login', '/signup', '/auth'].some(path => pathname.startsWith(path));
+  const isOnboardingRoute = pathname.startsWith('/onboarding');
+  const isSuccessPage = pathname === '/onboarding/success';
+  
+  // 2. Authentication Gate: Redirect to login if no user
+  if (!user && !isPublicRoute) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
 
-  // If there is no user and the user is trying to access a protected route
-  if (isProtectedRoute && !user) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // 3. Onboarding "Iron Gate" Funnel: Force onboarding if not completed
+  if (user && !isPublicRoute && !isOnboardingRoute && !isSuccessPage) {
+    const hasCompletedOnboarding = user.user_metadata?.has_completed_onboarding === true;
+    if (!hasCompletedOnboarding) {
+      return NextResponse.redirect(new URL('/onboarding', request.url));
+    }
   }
 
   return response
