@@ -1,16 +1,17 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useFormStatus } from 'react-dom'
 import { EmailEditor } from './email-editor'
 import { VariablePicker } from './variable-picker'
-import { Loader2, Eye } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import Link from 'next/link'
 import type { EmailTemplate } from '@/utils/email/types'
 
 interface TemplateFormProps {
   template?: EmailTemplate
   action: (formData: FormData) => Promise<{ error?: string; success?: boolean }>
-  onSuccess?: () => void
 }
 
 function SubmitButton() {
@@ -34,11 +35,11 @@ function SubmitButton() {
   )
 }
 
-export function TemplateForm({ template, action, onSuccess }: TemplateFormProps) {
+export function TemplateForm({ template, action }: TemplateFormProps) {
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [subject, setSubject] = useState(template?.subject || '')
   const [bodyHtml, setBodyHtml] = useState(template?.body_html || '')
-  const [showPreview, setShowPreview] = useState(false)
   const subjectInputRef = useRef<HTMLInputElement>(null)
 
   async function handleSubmit(formData: FormData) {
@@ -51,8 +52,8 @@ export function TemplateForm({ template, action, onSuccess }: TemplateFormProps)
 
     if (result?.error) {
       setError(result.error)
-    } else if (result?.success && onSuccess) {
-      onSuccess()
+    } else if (result?.success) {
+      router.push('/admin/email/templates')
     }
   }
 
@@ -178,38 +179,12 @@ export function TemplateForm({ template, action, onSuccess }: TemplateFormProps)
       <div>
         <div className="flex items-center justify-between mb-2">
           <label className="block text-sm font-medium text-gray-700">
-            Email Body (HTML) *
+            Email Body *
           </label>
-          <div className="flex items-center gap-2">
-            <VariablePicker onInsert={handleInsertVariable} />
-            <button
-              type="button"
-              onClick={() => setShowPreview(!showPreview)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
-            >
-              <Eye className="w-4 h-4" />
-              {showPreview ? 'Hide' : 'Show'} Preview
-            </button>
-          </div>
+          <VariablePicker onInsert={handleInsertVariable} />
         </div>
         <EmailEditor content={bodyHtml} onChange={setBodyHtml} />
       </div>
-
-      {/* Preview */}
-      {showPreview && (
-        <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Preview</h3>
-          <div className="bg-white border border-gray-200 rounded p-4">
-            <div className="text-sm font-medium text-gray-900 mb-2">
-              Subject: {subject}
-            </div>
-            <div
-              className="prose prose-sm max-w-none"
-              dangerouslySetInnerHTML={{ __html: bodyHtml }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Plain Text Version */}
       <div>
@@ -246,6 +221,12 @@ export function TemplateForm({ template, action, onSuccess }: TemplateFormProps)
 
       {/* Actions */}
       <div className="flex justify-end gap-3">
+        <Link
+          href="/admin/email/templates"
+          className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition"
+        >
+          Cancel
+        </Link>
         <SubmitButton />
       </div>
     </form>

@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Mail, FileText, Send, List, Clock, Inbox } from 'lucide-react'
+import { Mail, FileText, Send, List, Clock, Inbox, Users } from 'lucide-react'
 
 export default async function EmailHomePage() {
   const supabase = await createClient()
@@ -88,7 +88,7 @@ export default async function EmailHomePage() {
             Email Templates
           </h3>
           <p className="text-sm text-gray-600">
-            Create and manage email templates with WYSIWYG editor
+            Create and manage email templates with live HTML preview
           </p>
         </Link>
 
@@ -149,6 +149,21 @@ export default async function EmailHomePage() {
           </h3>
           <p className="text-sm text-gray-600">
             Receive and send emails using various sender addresses
+          </p>
+        </Link>
+
+        <Link
+          href="/admin/email/mailing-list"
+          className="bg-white border-2 border-gray-200 rounded-lg p-6 hover:border-blue-500 hover:shadow-lg transition group"
+        >
+          <div className="flex items-center justify-center w-12 h-12 bg-teal-100 rounded-lg mb-4 group-hover:bg-teal-200 transition">
+            <Users className="w-6 h-6 text-teal-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-teal-600 transition">
+            Mailing List
+          </h3>
+          <p className="text-sm text-gray-600">
+            Manage external contacts and sync the full mailing list to Resend
           </p>
         </Link>
       </div>

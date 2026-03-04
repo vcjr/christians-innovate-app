@@ -125,7 +125,7 @@ export default async function Dashboard({
           <p className="text-sm sm:text-base text-gray-600 mt-1">Building for the next 5, 50, and 500 years.</p>
         </header>
 
-        {/* Show available plans if user has no subscription */}
+        {/* Show available plans if no default plan has been set yet */}
         {subscribedPlanIds.length === 0 && (
           <div className="space-y-6">
             {/* Check if user expected auto-subscription but it failed */}

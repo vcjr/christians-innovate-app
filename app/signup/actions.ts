@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { sendEmail } from '@/utils/email/sender'
-import { renderEmailTemplate, wrapEmailLayout } from '@/utils/email/templates'
+import { renderEmailTemplate } from '@/utils/email/templates'
 import { generateUnsubscribeUrl } from '@/utils/email/tokens'
 
 export async function signup(formData: FormData) {
@@ -89,11 +89,12 @@ export async function signup(formData: FormData) {
               id: authData.user.id,
             },
             unsubscribe_link: unsubscribeLink,
+            site_url: process.env.NEXT_PUBLIC_SITE_URL || 'https://christiansinnovate.com',
           }
 
           const rendered = renderEmailTemplate(
             template.subject,
-            wrapEmailLayout(template.body_html, unsubscribeLink),
+            template.body_html,
             template.body_text,
             variables
           )

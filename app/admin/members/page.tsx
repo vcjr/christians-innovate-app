@@ -55,7 +55,7 @@ export default async function MembersPage() {
   })) || []
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-10 sm:space-y-12">
       <div>
         <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Members</h2>
         <p className="text-sm sm:text-base text-gray-600">Manage user accounts and permissions</p>

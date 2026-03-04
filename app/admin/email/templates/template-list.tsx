@@ -1,12 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react'
 import type { EmailTemplate } from '@/utils/email/types'
-import { TemplateForm } from './template-form'
 import {
-  createTemplate,
-  updateTemplate,
   deleteTemplate,
   toggleTemplateActive,
 } from './actions'
@@ -17,10 +15,6 @@ interface TemplateListProps {
 
 export function TemplateList({ templates: initialTemplates }: TemplateListProps) {
   const [templates, setTemplates] = useState(initialTemplates)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(
-    null
-  )
   const [deletingTemplate, setDeletingTemplate] = useState<EmailTemplate | null>(
     null
   )
@@ -48,25 +42,25 @@ export function TemplateList({ templates: initialTemplates }: TemplateListProps)
     <div>
       {/* Create Button */}
       <div className="mb-6 flex justify-end">
-        <button
-          onClick={() => setShowCreateModal(true)}
+        <Link
+          href="/admin/email/templates/new"
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
           <Plus className="w-4 h-4" />
           Create Template
-        </button>
+        </Link>
       </div>
 
       {/* Templates Grid */}
       {templates.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
           <p className="text-gray-600 mb-4">No email templates yet</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
+          <Link
+            href="/admin/email/templates/new"
             className="text-blue-600 hover:text-blue-700 font-medium"
           >
             Create your first template
-          </button>
+          </Link>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -129,13 +123,13 @@ export function TemplateList({ templates: initialTemplates }: TemplateListProps)
               )}
 
               <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
-                <button
-                  onClick={() => setEditingTemplate(template)}
+                <Link
+                  href={`/admin/email/templates/${template.id}/edit`}
                   className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded transition"
                 >
                   <Edit className="w-4 h-4" />
                   Edit
-                </button>
+                </Link>
                 <button
                   onClick={() => handleToggleActive(template)}
                   className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded transition"
@@ -162,63 +156,6 @@ export function TemplateList({ templates: initialTemplates }: TemplateListProps)
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">
-                Create Email Template
-              </h2>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-6">
-              <TemplateForm
-                action={createTemplate}
-                onSuccess={() => {
-                  setShowCreateModal(false)
-                  window.location.reload()
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {editingTemplate && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">
-                Edit Template: {editingTemplate.name}
-              </h2>
-              <button
-                onClick={() => setEditingTemplate(null)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-6">
-              <TemplateForm
-                template={editingTemplate}
-                action={updateTemplate}
-                onSuccess={() => {
-                  setEditingTemplate(null)
-                  window.location.reload()
-                }}
-              />
-            </div>
-          </div>
         </div>
       )}
 

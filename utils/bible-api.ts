@@ -2,6 +2,7 @@
 // Fetches verses from local Supabase database
 
 import { createClient } from '@/utils/supabase/server'
+import { createServiceClient } from '@/utils/supabase/server'
 import { parseBibleText } from './bible-text-parser'
 
 // Supported Bible translations (currently imported in database)
@@ -236,4 +237,82 @@ export function parseScriptureReference(reference: string): {
   }
 
   return null
+}
+
+/**
+ * Fetch plain-text verse snippets for a batch of scripture references.
+ * Designed for server-side email sending (uses service client, bypasses RLS).
+ * Returns a Map keyed by the original reference string.
+ *
+ * @param references  - Array of unique scripture reference strings
+ * @param translation - Bible translation to use (default: KJV)
+ * @param maxVerses   - Max verses to include per reference (default: 3)
+ */
+export async function fetchVerseSnippetsForEmail(
+  references: string[],
+  translation: TranslationKey = 'KJV',
+  maxVerses = 3
+): Promise<Map<string, string>> {
+  const snippetMap = new Map<string, string>()
+  const uniqueRefs = [...new Set(references.filter(Boolean))]
+
+  if (uniqueRefs.length === 0) return snippetMap
+
+  const supabase = createServiceClient()
+  const translationCode = BIBLE_TRANSLATIONS[translation]
+
+  for (const reference of uniqueRefs) {
+    const parsed = parseScriptureReference(reference)
+    if (!parsed) {
+      console.warn('[fetchVerseSnippetsForEmail] Could not parse reference:', reference)
+      snippetMap.set(reference, reference)
+      continue
+    }
+
+    try {
+      let query = supabase
+        .from('bible_verses')
+        .select('verse_start, text')
+        .eq('translation', translationCode)
+        .eq('book', parsed.book)
+        .eq('chapter', parsed.chapter)
+        .not('verse_start', 'is', null)
+        .order('verse_start', { ascending: true })
+        .limit(maxVerses)
+
+      if (parsed.verseStart !== null) {
+        query = query.gte('verse_start', parsed.verseStart)
+        if (parsed.verseEnd !== null) {
+          query = query.lte('verse_start', parsed.verseEnd)
+        }
+      }
+
+      const { data: verses, error } = await query
+
+      if (error || !verses || verses.length === 0) {
+        console.warn('[fetchVerseSnippetsForEmail] No verses found for:', reference)
+        snippetMap.set(reference, reference) // fall back to the reference string
+        continue
+      }
+
+      // Join cleaned verse texts into a single readable snippet
+      const combined = verses
+        .map((v) => parseBibleText(v.text, translation))
+        .join(' ')
+        .trim()
+
+      // Truncate at ≈200 chars at a word boundary
+      const snippet =
+        combined.length <= 200
+          ? combined
+          : combined.slice(0, 200).replace(/\s+\S*$/, '') + '\u2026'
+
+      snippetMap.set(reference, snippet)
+    } catch (err) {
+      console.error('[fetchVerseSnippetsForEmail] Error for reference:', reference, err)
+      snippetMap.set(reference, reference)
+    }
+  }
+
+  return snippetMap
 }

@@ -47,6 +47,7 @@ const AVAILABLE_VARIABLES = [
     category: 'System',
     variables: [
       { key: '{{unsubscribe_link}}', description: 'Unsubscribe URL' },
+      { key: '{{site_url}}', description: 'Base site URL' },
     ],
   },
 ]

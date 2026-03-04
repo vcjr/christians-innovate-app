@@ -16,15 +16,41 @@ export function interpolateTemplate(
     let value: unknown = variables
 
     for (const key of keys) {
-      if (value && typeof value === 'object' && key in value) {
-        value = value[key]
+      if (value && typeof value === 'object' && key in (value as Record<string, unknown>)) {
+        value = (value as Record<string, unknown>)[key]
       } else {
-        // Return the original placeholder if variable not found
-        return match
+        // Return empty string if variable not found (prevents raw placeholders in sent emails)
+        return ''
       }
     }
 
-    return value !== undefined && value !== null ? String(value) : match
+    return value !== undefined && value !== null ? String(value) : ''
+  })
+}
+
+/**
+ * Check which template variable paths would resolve to an empty / missing value
+ * given a variables object. Returns an array of dot-paths that have no value.
+ * Useful for guarding sends before dispatching emails with blank placeholders.
+ */
+export function getMissingVariables(
+  template: string,
+  variables: EmailVariables
+): string[] {
+  const paths = extractTemplateVariables(template)
+  return paths.filter((path) => {
+    const keys = path.split('.')
+    let value: unknown = variables
+
+    for (const key of keys) {
+      if (value && typeof value === 'object' && key in (value as Record<string, unknown>)) {
+        value = (value as Record<string, unknown>)[key]
+      } else {
+        return true // path doesn't exist → missing
+      }
+    }
+
+    return value === undefined || value === null || value === ''
   })
 }
 
@@ -67,6 +93,31 @@ export function renderEmailTemplate(
 }
 
 /**
+ * Strip basic Markdown syntax and return a plain-text excerpt.
+ * Strips headings, bold, italic, links, blockquotes, code, and list markers.
+ * Truncates to `maxLength` characters at the nearest word boundary.
+ */
+export function excerptMarkdown(markdown: string | null | undefined, maxLength = 180): string {
+  if (!markdown) return ''
+
+  const plain = markdown
+    .replace(/#{1,6}\s+/g, '')         // headings
+    .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')  // bold / italic
+    .replace(/_([^_]+)_/g, '$1')       // underscore italic
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // links
+    .replace(/`{1,3}[^`]*`{1,3}/g, '') // inline / fenced code
+    .replace(/^>\s+/gm, '')            // blockquotes
+    .replace(/^[-*+]\s+/gm, '')        // unordered lists
+    .replace(/^\d+\.\s+/gm, '')        // ordered lists
+    .replace(/\n+/g, ' ')              // collapse newlines
+    .trim()
+
+  if (plain.length <= maxLength) return plain
+  // Trim at the last space before maxLength so words aren't split
+  return plain.slice(0, maxLength).replace(/\s+\S*$/, '') + '\u2026'
+}
+
+/**
  * Get default unsubscribe footer HTML
  * @param unsubscribeLink - The unsubscribe URL
  * @returns HTML string for email footer
@@ -83,39 +134,87 @@ export function getUnsubscribeFooter(unsubscribeLink: string): string {
 }
 
 /**
- * Wrap email content with a standard email layout
+ * Wrap email content with the branded Christians Innovate email layout.
+ * Includes gradient accent bar, logo header, dark-mode & Outlook support.
  * @param content - The main email content HTML
  * @param unsubscribeLink - Optional unsubscribe link
- * @returns Complete HTML email with layout
+ * @returns Complete HTML email with branded layout
  */
 export function wrapEmailLayout(
   content: string,
   unsubscribeLink?: string
 ): string {
-  return `
-<!DOCTYPE html>
-<html lang="en">
+  const fontStack = `-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif`
+
+  const footer = unsubscribeLink
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding: 32px 0 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e7eb;">
+            <tr><td style="padding:24px 0 0; text-align:center; font-family:${fontStack}; font-size:13px; line-height:20px; color:#6b7280;">
+              Christians Innovate &mdash; Building for the next 5, 50 &amp; 500 years.<br>
+              <a href="${unsubscribeLink}" style="color:#2563eb;text-decoration:underline;">Unsubscribe</a>
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>`
+    : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding: 32px 0 0;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e7eb;">
+            <tr><td style="padding:24px 0 0; text-align:center; font-family:${fontStack}; font-size:13px; line-height:20px; color:#6b7280;">
+              Christians Innovate &mdash; Building for the next 5, 50 &amp; 500 years.
+            </td></tr>
+          </table>
+        </td></tr>
+      </table>`
+
+  return `<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Christians Innovate</title>
+  <!--[if mso]>
+  <noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+  <![endif]-->
+  <style>
+    @media (prefers-color-scheme:dark){
+      .email-bg{background:#1a1a2e!important}
+      .card-bg{background:#1e293b!important}
+      .body-text{color:#e2e8f0!important}
+      .muted-text{color:#94a3b8!important}
+    }
+    @media only screen and (max-width:620px){
+      .container{width:100%!important}
+      .card-pad{padding:28px 20px!important}
+    }
+  </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f9fafb;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);">
-          <tr>
-            <td style="padding: 40px;">
+<body class="email-bg" style="margin:0;padding:0;background:#f1f5f9;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="email-bg" style="background:#f1f5f9;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table role="presentation" class="container" width="600" cellpadding="0" cellspacing="0">
+        <!-- Accent bar -->
+        <tr><td style="height:4px;background:linear-gradient(90deg,#2563eb 0%,#3b82f6 50%,#60a5fa 100%);border-radius:24px 24px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+        <!-- Card -->
+        <tr><td class="card-bg card-pad" style="background:#ffffff;padding:40px 48px;border-radius:0 0 24px 24px;">
+          <!-- Logo -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr><td style="padding-bottom:32px;border-bottom:1px solid #e5e7eb;text-align:center;">
+              <span style="font-family:${fontStack};font-weight:800;font-size:22px;letter-spacing:-.3px;color:#111827;">Christians Innovate</span>
+            </td></tr>
+          </table>
+          <!-- Content -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr><td class="body-text" style="padding-top:32px;font-family:${fontStack};font-size:16px;line-height:26px;color:#374151;">
               ${content}
-              ${unsubscribeLink ? getUnsubscribeFooter(unsubscribeLink) : ''}
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
+            </td></tr>
+          </table>
+          ${footer}
+        </td></tr>
+      </table>
+    </td></tr>
   </table>
 </body>
-</html>
-  `.trim()
+</html>`
 }
