@@ -20,20 +20,37 @@ export default async function Dashboard() {
     .select('plan_id')
     .eq('user_id', user.id)
 
-  const subscribedPlanIds = subscriptions?.map(s => s.plan_id) || []
+  let subscribedPlanIds = subscriptions?.map(s => s.plan_id) || []
 
-  // 3. Fetch all reading plans
+  // 3. If no subscription, auto-subscribe to the default plan (existing members)
+  if (subscribedPlanIds.length === 0) {
+    const { data: defaultPlan } = await supabase
+      .from('reading_plans')
+      .select('id')
+      .eq('is_default', true)
+      .single()
+
+    if (defaultPlan) {
+      await supabase
+        .from('plan_subscriptions')
+        .insert({ user_id: user.id, plan_id: defaultPlan.id })
+        .select()
+      subscribedPlanIds = [defaultPlan.id]
+    }
+  }
+
+  // 4. Fetch all reading plans (used when no plan at all is available)
   const { data: allPlans } = await supabase
     .from('reading_plans')
     .select('*')
     .order('created_at', { ascending: false })
 
-  // 4. If user has subscriptions, fetch their plan days with progress
+  // 5. If user has subscriptions, fetch their plan days with progress
   let planDays = null
   let currentPlan = null
 
   if (subscribedPlanIds.length > 0) {
-    // For now, show the first subscribed plan
+    // Show the first subscribed plan (prioritise the default if multiple)
     const activePlanId = subscribedPlanIds[0]
 
     const { data: plan } = await supabase
@@ -64,7 +81,7 @@ export default async function Dashboard() {
           <p className="text-sm sm:text-base text-gray-600 mt-1">Building for the next 5, 50, and 500 years.</p>
         </header>
 
-        {/* Show available plans if user has no subscription */}
+        {/* Show available plans if no default plan has been set yet */}
         {subscribedPlanIds.length === 0 && (
           <div className="space-y-6">
             <div>

@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react'
 import { useFormStatus } from 'react-dom'
 import { Loader2, Send, Users, Mail } from 'lucide-react'
 import type { EmailTemplate } from '@/utils/email/types'
+import type { SenderAddress } from '@/utils/email/scheduled-jobs'
 import { sendBroadcast, getRecipientCount } from './actions'
 import { EmailEditor } from '../templates/email-editor'
 import { VariablePicker } from '../templates/variable-picker'
 
 interface BroadcastFormProps {
   templates: EmailTemplate[]
+  senderAddresses: SenderAddress[]
 }
 
 function SubmitButton({ recipientCount }: { recipientCount: number }) {
@@ -36,7 +38,12 @@ function SubmitButton({ recipientCount }: { recipientCount: number }) {
   )
 }
 
-export function BroadcastForm({ templates }: BroadcastFormProps) {
+export function BroadcastForm({ templates, senderAddresses }: BroadcastFormProps) {
+  const defaultFrom =
+    senderAddresses.find((s) => s.purpose === 'noreply')?.email_address ||
+    senderAddresses[0]?.email_address ||
+    'noreply@christiansinnovate.com'
+  const [selectedFrom, setSelectedFrom] = useState(defaultFrom)
   const [recipientFilter, setRecipientFilter] = useState('email_enabled')
   const [selectedTemplate, setSelectedTemplate] = useState<string>('custom')
   const [customSubject, setCustomSubject] = useState('')
@@ -47,6 +54,7 @@ export function BroadcastForm({ templates }: BroadcastFormProps) {
     sent: number
     failed: number
     total: number
+    warning?: string
   } | null>(null)
 
   // Fetch recipient count when filter changes
@@ -73,11 +81,12 @@ export function BroadcastForm({ templates }: BroadcastFormProps) {
 
     if (result?.error) {
       setError(result.error)
-    } else if (result?.success) {
+    } else if (result && 'success' in result && result.success) {
       setSuccess({
         sent: result.sent || 0,
         failed: result.failed || 0,
         total: result.total || 0,
+        warning: result.warning,
       })
     }
   }
@@ -103,6 +112,11 @@ export function BroadcastForm({ templates }: BroadcastFormProps) {
             Sent: {success.sent} | Failed: {success.failed} | Total:{' '}
             {success.total}
           </div>
+          {success.warning && (
+            <div className="text-amber-700 text-sm mt-2 border-t border-green-200 pt-2">
+              ⚠ {success.warning}
+            </div>
+          )}
         </div>
       )}
 
@@ -214,6 +228,26 @@ export function BroadcastForm({ templates }: BroadcastFormProps) {
             this email
           </div>
         </div>
+      </div>
+
+      {/* Sender Address */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Mail className="w-5 h-5 text-gray-600" />
+          <h2 className="text-lg font-semibold text-gray-900">From Address</h2>
+        </div>
+        <select
+          name="from_email"
+          value={selectedFrom}
+          onChange={(e) => setSelectedFrom(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          {senderAddresses.map((addr) => (
+            <option key={addr.id} value={addr.email_address}>
+              {addr.display_name} &lt;{addr.email_address}&gt;
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Email Content */}

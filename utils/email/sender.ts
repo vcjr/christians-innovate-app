@@ -163,7 +163,7 @@ export async function sendEmail(params: SendEmailParams) {
  * @returns Results for each email
  */
 export async function sendBatchEmails(params: SendBatchEmailParams) {
-  const { recipients, templateKey, subject: subjectOverride, metadata } = params
+  const { recipients, templateKey, subject: subjectOverride, from: fromOverride, metadata } = params
 
   // Fetch the template from database
   const supabase = await createClient()
@@ -191,7 +191,7 @@ export async function sendBatchEmails(params: SendBatchEmailParams) {
     for (const recipient of batch) {
       try {
         // Import template rendering here to avoid circular dependency
-        const { renderEmailTemplate } = await import('./templates')
+        const { renderEmailTemplate, getMissingVariables } = await import('./templates')
         const { generateUnsubscribeUrl } = await import('./tokens')
 
         // Add unsubscribe link if userId is available
@@ -200,6 +200,21 @@ export async function sendBatchEmails(params: SendBatchEmailParams) {
           unsubscribe_link: recipient.userId
             ? generateUnsubscribeUrl(recipient.userId, recipient.email)
             : undefined,
+        }
+
+        // Guard: detect missing template variables before sending
+        // unsubscribe_link is optional (external contacts may not have userId)
+        const templateContent =
+          (subjectOverride || template.subject) + '\n' + template.body_html
+        const missingVars = getMissingVariables(templateContent, variables).filter(
+          (v) => v !== 'unsubscribe_link'
+        )
+
+        if (missingVars.length > 0) {
+          const errorMsg = `Email not sent — missing required template variables: ${missingVars.join(', ')}`
+          console.warn(`[sendBatchEmails] Skipping ${recipient.email}: ${errorMsg}`)
+          results.push({ email: recipient.email, success: false, error: errorMsg })
+          continue
         }
 
         const rendered = renderEmailTemplate(
@@ -214,6 +229,7 @@ export async function sendBatchEmails(params: SendBatchEmailParams) {
           subject: rendered.subject,
           html: rendered.html,
           text: rendered.text,
+          from: fromOverride,
           templateKey,
           userId: recipient.userId,
           metadata,

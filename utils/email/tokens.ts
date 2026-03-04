@@ -7,6 +7,15 @@ export interface UnsubscribeTokenPayload {
   email: string
 }
 
+export interface ExternalUnsubscribeTokenPayload {
+  email: string
+  type: 'external'
+}
+
+export type AnyUnsubscribePayload =
+  | UnsubscribeTokenPayload
+  | ExternalUnsubscribeTokenPayload
+
 /**
  * Generate an unsubscribe token for a user
  * @param userId - The user's ID
@@ -58,4 +67,42 @@ export function generateUnsubscribeUrl(
   const token = generateUnsubscribeToken(userId, email)
   const siteUrl = baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
   return `${siteUrl}/unsubscribe/${token}`
+}
+
+// ── External (non-app-member) unsubscribe tokens ─────────────────────────────
+
+export function generateExternalUnsubscribeToken(email: string): string {
+  const payload: ExternalUnsubscribeTokenPayload = { email, type: 'external' }
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '365d' })
+}
+
+export function verifyExternalUnsubscribeToken(
+  token: string
+): ExternalUnsubscribeTokenPayload | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as ExternalUnsubscribeTokenPayload
+    if (decoded.type !== 'external') return null
+    return decoded
+  } catch {
+    return null
+  }
+}
+
+export function generateExternalUnsubscribeUrl(email: string, baseUrl?: string): string {
+  const token = generateExternalUnsubscribeToken(email)
+  const siteUrl = baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  return `${siteUrl}/unsubscribe/${token}`
+}
+
+/**
+ * Verify any unsubscribe token (app member or external contact).
+ * Returns the decoded payload, or null if invalid.
+ */
+export function verifyAnyUnsubscribeToken(token: string): AnyUnsubscribePayload | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as AnyUnsubscribePayload
+    return decoded
+  } catch {
+    return null
+  }
 }

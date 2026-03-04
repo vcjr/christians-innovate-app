@@ -33,6 +33,13 @@ export default async function BroadcastPage() {
     .eq('is_active', true)
     .order('name')
 
+  // Fetch active sender addresses
+  const { data: senderAddresses } = await supabase
+    .from('sender_addresses')
+    .select('*')
+    .eq('is_active', true)
+    .order('email_address')
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Breadcrumb */}
@@ -51,7 +58,7 @@ export default async function BroadcastPage() {
         </p>
       </div>
 
-      <BroadcastForm templates={templates || []} />
+      <BroadcastForm templates={templates || []} senderAddresses={senderAddresses || []} />
     </div>
   )
 }

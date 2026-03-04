@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
-import { verifyUnsubscribeToken } from '@/utils/email/tokens'
+import { verifyAnyUnsubscribeToken } from '@/utils/email/tokens'
 import { UnsubscribeForm } from './unsubscribe-form'
+import { ExternalUnsubscribeForm } from './external-unsubscribe-form'
 
 interface UnsubscribePageProps {
   params: Promise<{ token: string }>
@@ -9,8 +10,7 @@ interface UnsubscribePageProps {
 export default async function UnsubscribePage({ params }: UnsubscribePageProps) {
   const { token } = await params
 
-  // Verify the token
-  const payload = verifyUnsubscribeToken(token)
+  const payload = verifyAnyUnsubscribeToken(token)
 
   if (!payload) {
     return (
@@ -46,13 +46,33 @@ export default async function UnsubscribePage({ params }: UnsubscribePageProps) 
     )
   }
 
+  // ── External contact (non-app-member) ─────────────────────────────────────
+  if ('type' in payload && payload.type === 'external') {
+    const supabase = await createClient()
+    const { data: contact } = await supabase
+      .from('external_contacts')
+      .select('is_unsubscribed, first_name')
+      .eq('email', payload.email)
+      .single()
+
+    return (
+      <ExternalUnsubscribeForm
+        email={payload.email}
+        firstName={contact?.first_name ?? null}
+        currentlyUnsubscribed={contact?.is_unsubscribed ?? false}
+      />
+    )
+  }
+
+  // ── App member ───────────────────────────────────────────────────────────
+  // TypeScript can't narrow through early-return branches; assert the app-member type
+  const { userId } = payload as import('@/utils/email/tokens').UnsubscribeTokenPayload
   const supabase = await createClient()
 
-  // Check if user exists and get current settings
   const { data: profile } = await supabase
     .from('user_profiles')
     .select('email_notifications_enabled, full_name')
-    .eq('user_id', payload.userId)
+    .eq('user_id', userId)
     .single()
 
   if (!profile) {
@@ -70,7 +90,7 @@ export default async function UnsubscribePage({ params }: UnsubscribePageProps) 
 
   return (
     <UnsubscribeForm
-      userId={payload.userId}
+      userId={userId}
       email={payload.email}
       currentlyUnsubscribed={!profile.email_notifications_enabled}
       userName={profile.full_name}

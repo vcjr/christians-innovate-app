@@ -90,6 +90,7 @@ export async function GET(request: Request) {
                   email: r.email,
                   id: r.user_id,
                 },
+                site_url: process.env.NEXT_PUBLIC_SITE_URL || 'https://christiansinnovate.com',
                 ...(job.custom_variables || {}),
               },
             })),

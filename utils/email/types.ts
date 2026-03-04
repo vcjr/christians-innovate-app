@@ -59,6 +59,8 @@ export interface EmailVariables {
     }>
   }
   unsubscribe_link?: string
+  site_url?: string
+  signup_url?: string
   [key: string]: unknown
 }
 
@@ -81,5 +83,6 @@ export interface SendBatchEmailParams {
   }>
   templateKey: string
   subject?: string
+  from?: string
   metadata?: Record<string, unknown>
 }
