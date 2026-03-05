@@ -243,8 +243,7 @@ function renderFeatureGrid(block: FeatureGridBlock): string {
 
     const leftCell = `<td width="50%" valign="top" class="stack" style="padding-right: 8px;${isLastRow ? '' : ' padding-bottom: 8px;'}">
                 <div style="background-color: #f8fafc; border: 1px solid #f3f4f6; border-radius: 16px; padding: 20px;">
-                    <p style="margin: 0 0 6px 0; font-size: 22px; line-height: 1;">${left.emoji}</p>
-                    <p style="margin: 0 0 4px 0; font-family: ${FONT_STACK}; font-size: 15px; font-weight: 700; color: #111827;">${esc(left.title)}</p>
+                    <p style="margin: 0 0 4px 0; font-family: ${FONT_STACK}; font-size: 15px; font-weight: 700; color: #111827;">${left.emoji} ${esc(left.title)}</p>
                     <p style="margin: 0; font-family: ${FONT_STACK}; font-size: 13px; color: #6b7280; line-height: 1.5;">${esc(left.description)}</p>
                 </div>
             </td>`
@@ -252,8 +251,7 @@ function renderFeatureGrid(block: FeatureGridBlock): string {
     const rightCell = right
       ? `<td width="50%" valign="top" class="stack" style="padding-left: 8px;${isLastRow ? '' : ' padding-bottom: 8px;'}">
                 <div style="background-color: #f8fafc; border: 1px solid #f3f4f6; border-radius: 16px; padding: 20px;">
-                    <p style="margin: 0 0 6px 0; font-size: 22px; line-height: 1;">${right.emoji}</p>
-                    <p style="margin: 0 0 4px 0; font-family: ${FONT_STACK}; font-size: 15px; font-weight: 700; color: #111827;">${esc(right.title)}</p>
+                    <p style="margin: 0 0 4px 0; font-family: ${FONT_STACK}; font-size: 15px; font-weight: 700; color: #111827;">${right.emoji} ${esc(right.title)}</p>
                     <p style="margin: 0; font-family: ${FONT_STACK}; font-size: 13px; color: #6b7280; line-height: 1.5;">${esc(right.description)}</p>
                 </div>
             </td>`
@@ -318,8 +316,7 @@ function renderStatsRow(block: StatsRowBlock): string {
     .map(
       (stat, i) => `<td width="33%" class="stack" style="${paddings[i]}">
                 <div style="text-align: center; padding: 20px 12px; background-color: #f8fafc; border: 1px solid #e5e7eb; border-radius: 14px;">
-                    <p style="margin: 0 0 4px 0; font-size: 24px; line-height: 1;">${stat.emoji}</p>
-                    <p style="margin: 0 0 2px 0; font-family: ${FONT_STACK}; font-size: 24px; font-weight: 800; color: #111827; line-height: 1.2;">${escBody(stat.value)}</p>
+                    <p style="margin: 0 0 2px 0; font-family: ${FONT_STACK}; font-size: 24px; font-weight: 800; color: #111827; line-height: 1.2;">${stat.emoji} ${escBody(stat.value)}</p>
                     <p style="margin: 0; font-family: ${FONT_STACK}; font-size: 12px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px;">${esc(stat.label)}</p>
                 </div>
             </td>`
