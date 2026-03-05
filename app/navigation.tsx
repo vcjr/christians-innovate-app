@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import Image from 'next/image'
-import { LayoutDashboard, Shield, LogOut, Users, Rocket } from 'lucide-react'
+import { LayoutDashboard, Shield, LogOut, Users, Rocket, FolderOpen } from 'lucide-react'
 import { signOut } from './actions'
 import { MobileMenu } from './mobile-menu'
 import { UserProfileDropdown } from './user-profile-dropdown'
@@ -73,9 +73,17 @@ export async function NavigationBar() {
                 Directory
               </Link>
 
+              <Link
+                href="/resources"
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium transition"
+              >
+                <FolderOpen className="h-4 w-4" />
+                Resources
+              </Link>
+
               {isAdmin && (
                 <Link
-                  href="/admin/plans"
+                  href="/admin/dashboard"
                   className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium transition"
                 >
                   <Shield className="h-4 w-4" />
