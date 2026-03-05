@@ -1,12 +1,21 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { unsubscribeFromPlan } from './actions'
+import { getAllCalendarDays, getPlanDays } from './actions'
 import { SubscribeButton } from './subscribe-button'
 import { ReadingProgress } from './reading-progress'
+import { CalendarView } from './calendar-view'
+import { ViewToggle } from './view-toggle'
 import { LaunchPrayerPreview } from './launch-prayer-preview'
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>
+}) {
   const supabase = await createClient()
+  const resolvedParams = await searchParams
+  const view = resolvedParams.view === 'list' ? 'list' : 'calendar'
 
   // 1. Check Auth
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,18 +31,22 @@ export default async function Dashboard() {
 
   const subscribedPlanIds = subscriptions?.map(s => s.plan_id) || []
 
-  // 3. Fetch all reading plans
-  const { data: allPlans } = await supabase
-    .from('reading_plans')
-    .select('*')
-    .order('created_at', { ascending: false })
+  // 3. If not subscribed, fetch all reading plans to show
+  let allPlans = null
+  if (subscribedPlanIds.length === 0) {
+    const { data } = await supabase
+      .from('reading_plans')
+      .select('*')
+      .order('created_at', { ascending: false })
+    allPlans = data
+  }
 
-  // 4. If user has subscriptions, fetch their plan days with progress
-  let planDays = null
+  // 4. If subscribed, fetch plan details + view-specific data
   let currentPlan = null
+  let calendarData: { days: unknown[] } = { days: [] }
+  let listData: { days: unknown[]; hasMore: boolean } = { days: [], hasMore: false }
 
   if (subscribedPlanIds.length > 0) {
-    // For now, show the first subscribed plan
     const activePlanId = subscribedPlanIds[0]
 
     const { data: plan } = await supabase
@@ -44,16 +57,11 @@ export default async function Dashboard() {
 
     currentPlan = plan
 
-    const { data: days } = await supabase
-      .from('plan_days')
-      .select(`
-        *,
-        user_progress(is_completed)
-      `)
-      .eq('plan_id', activePlanId)
-      .order('day_number', { ascending: true })
-
-    planDays = days
+    if (view === 'calendar') {
+      calendarData = await getAllCalendarDays(activePlanId)
+    } else {
+      listData = await getPlanDays(activePlanId, 0, 10)
+    }
   }
 
   return (
@@ -102,9 +110,10 @@ export default async function Dashboard() {
           </div>
         )}
 
-        {/* Show current plan and daily readings if subscribed */}
+        {/* Show current plan if subscribed */}
         {subscribedPlanIds.length > 0 && currentPlan && (
           <div className="space-y-6">
+            {/* Plan header */}
             <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
@@ -124,7 +133,29 @@ export default async function Dashboard() {
               </div>
             </div>
 
-            <ReadingProgress days={planDays || []} />
+            {/* View toggle */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 hidden sm:block">Reading Plan</h3>
+              <ViewToggle currentView={view} />
+            </div>
+
+            {/* Calendar view */}
+            {view === 'calendar' && (
+              <CalendarView
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                allDays={calendarData.days as any[]}
+              />
+            )}
+
+            {/* List view with infinite scroll */}
+            {view === 'list' && (
+              <ReadingProgress
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                initialDays={listData.days as any[]}
+                planId={currentPlan.id}
+                hasMore={listData.hasMore}
+              />
+            )}
 
             {/* Launch & Prayer Preview */}
             <LaunchPrayerPreview />

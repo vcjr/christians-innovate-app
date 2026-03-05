@@ -1,30 +1,68 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { DayCard } from './day-card'
 import { SortControls } from './sort-controls'
 import { ArrowRight } from 'lucide-react'
+import { getPlanDays } from './actions'
 
 type SortOption = 'newest' | 'oldest' | 'day-asc' | 'day-desc'
 
 interface PlanDay {
   id: string
   day_number: number
-  title: string
+  date_assigned: string | null
   scripture_reference: string
-  notes: string | null
   content_markdown: string | null
   created_at: string
   user_progress?: Array<{ is_completed: boolean }>
 }
 
-export function ReadingProgress({ days }: { days: PlanDay[] }) {
-  const [sortBy, setSortBy] = useState<SortOption>('newest')
+interface ReadingProgressProps {
+  initialDays: PlanDay[]
+  planId: string
+  hasMore: boolean
+}
 
-  // Find the next incomplete day (first uncompleted when sorted by day number)
+export function ReadingProgress({ initialDays, planId, hasMore: initialHasMore }: ReadingProgressProps) {
+  const [days, setDays] = useState<PlanDay[]>(initialDays)
+  const [hasMore, setHasMore] = useState(initialHasMore)
+  const [page, setPage] = useState(0)
+  const [isLoading, setIsLoading] = useState(false)
+  const [sortBy, setSortBy] = useState<SortOption>('day-asc')
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
   const nextIncompleteDay = [...days]
     .sort((a, b) => a.day_number - b.day_number)
-    .find(day => !day.user_progress?.[0]?.is_completed)
+    .find((day) => !day.user_progress?.[0]?.is_completed)
+
+  const loadMore = useCallback(async () => {
+    if (isLoading || !hasMore) return
+    setIsLoading(true)
+    const nextPage = page + 1
+    const result = await getPlanDays(planId, nextPage, 10)
+    setDays((prev) => [...prev, ...(result.days as PlanDay[])])
+    setHasMore(result.hasMore)
+    setPage(nextPage)
+    setIsLoading(false)
+  }, [isLoading, hasMore, page, planId])
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore()
+        }
+      },
+      { rootMargin: '100px', threshold: 0 },
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [loadMore])
 
   const sortedDays = [...days].sort((a, b) => {
     switch (sortBy) {
@@ -55,10 +93,7 @@ export function ReadingProgress({ days }: { days: PlanDay[] }) {
             <h4 className="text-base font-semibold text-gray-900">Up Next</h4>
           </div>
           <div className="ring-2 ring-blue-500 ring-offset-2 rounded-lg">
-            <DayCard
-              day={nextIncompleteDay}
-              isCompleted={false}
-            />
+            <DayCard day={nextIncompleteDay} isCompleted={false} />
           </div>
         </div>
       )}
@@ -69,18 +104,29 @@ export function ReadingProgress({ days }: { days: PlanDay[] }) {
         {sortedDays.length > 0 ? (
           sortedDays.map((day) => {
             const isCompleted = day.user_progress?.[0]?.is_completed || false
-            return (
-              <DayCard
-                key={day.id}
-                day={day}
-                isCompleted={isCompleted}
-              />
-            )
+            return <DayCard key={day.id} day={day} isCompleted={isCompleted} />
           })
         ) : (
           <div className="bg-white border border-gray-200 rounded-lg p-8 sm:p-12 text-center">
-            <p className="text-sm sm:text-base text-gray-600">No daily readings available yet for this plan.</p>
+            <p className="text-sm sm:text-base text-gray-600">
+              No daily readings available yet for this plan.
+            </p>
           </div>
+        )}
+      </div>
+
+      {/* Infinite scroll sentinel */}
+      <div ref={sentinelRef} className="h-12 flex items-center justify-center mt-4">
+        {isLoading && (
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <div className="h-4 w-4 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin" />
+            Loading more days...
+          </div>
+        )}
+        {!hasMore && days.length > 0 && (
+          <p className="text-xs text-gray-400">
+            All {days.length} day{days.length !== 1 ? 's' : ''} loaded
+          </p>
         )}
       </div>
     </div>
