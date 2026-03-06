@@ -32,9 +32,14 @@ export function DayNavigation({
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
+      // Ignore auto-repeated keydown events when key is held down
+      if (e.repeat) return
+
       if (e.key === 'ArrowLeft' && prevDay) {
+        e.preventDefault()
         router.push(`/dashboard/day/${prevDay.id}`)
       } else if (e.key === 'ArrowRight' && nextDay) {
+        e.preventDefault()
         router.push(`/dashboard/day/${nextDay.id}`)
       }
     }
