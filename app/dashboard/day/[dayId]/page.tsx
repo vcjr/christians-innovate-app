@@ -61,7 +61,7 @@ export default async function DayViewPage({
       .lt('day_number', day.day_number)
       .order('day_number', { ascending: false })
       .limit(1)
-      .single(),
+      .maybeSingle(),
     supabase
       .from('plan_days')
       .select('id, day_number')
@@ -69,7 +69,7 @@ export default async function DayViewPage({
       .gt('day_number', day.day_number)
       .order('day_number', { ascending: true })
       .limit(1)
-      .single(),
+      .maybeSingle(),
     supabase
       .from('plan_days')
       .select('id', { count: 'exact', head: true })
