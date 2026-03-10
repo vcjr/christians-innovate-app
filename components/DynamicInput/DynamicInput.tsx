@@ -1,5 +1,5 @@
 import React from 'react';
-import FieldLayout from '../FieldLayout/FieldLayout';
+import FieldLayout, { InjectedInputProps } from '../FieldLayout/FieldLayout';
 
 /**
  * @interface Option
@@ -86,29 +86,33 @@ const DynamicInput = React.forwardRef<
   const commonClasses =
     'w-full px-4 py-2 border rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm';
 
-  const renderInput = () => {
+  const renderInputContent = (layoutProps: InjectedInputProps) => {
+    const finalClassName = `${commonClasses} ${layoutProps.errorClassName}`;
+
     switch (rest.type) {
       case 'textarea':
         return (
           <textarea
+            {...layoutProps}
             name={name}
             value={value}
             placeholder={placeholder}
             onChange={onChange}
             rows={rest.rows || 3}
             disabled={disabled}
-            className={commonClasses}
+            className={finalClassName}
             ref={ref as React.Ref<HTMLTextAreaElement>}
           />
         );
       case 'select':
         return (
           <select
+            {...layoutProps}
             name={name}
             value={value}
             onChange={onChange}
             disabled={disabled}
-            className={commonClasses}
+            className={finalClassName}
             ref={ref as React.Ref<HTMLSelectElement>}
           >
             {rest.options.map((option) => (
@@ -125,13 +129,14 @@ const DynamicInput = React.forwardRef<
       default:
         return (
           <input
+            {...layoutProps}
             type={rest.type || 'text'}
             name={name}
             value={value}
             placeholder={placeholder}
             onChange={onChange}
             disabled={disabled}
-            className={commonClasses}
+            className={finalClassName}
             ref={ref as React.Ref<HTMLInputElement>}
           />
         );
@@ -139,8 +144,12 @@ const DynamicInput = React.forwardRef<
   };
 
   return ( // Pass the rendered input to inputSlot, no children for FieldLayout
-    <FieldLayout label={label} error={error} inputSlot={renderInput()}>
-    </FieldLayout>
+    <FieldLayout 
+      label={label} 
+      error={error} 
+      renderInput={renderInputContent} 
+      isGroup={false} 
+    />
   );
 });
 

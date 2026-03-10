@@ -60,22 +60,23 @@ const TagInput: React.FC<TagInputProps> = ({
       label={label}
       inputId={finalId}
       error={error}
-      inputSlot={ // Pass the actual input element to inputSlot
+      isGroup={false}
+      renderInput={(layoutProps) => (
         <input
-          id={finalId}
+          {...layoutProps}
           type="text"
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleInputKeyDown}
           placeholder={placeholder}
-          className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          className={`w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${layoutProps.errorClassName}`}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={availableTags.length > 0 ? 'true' : 'false'}
           aria-label={TAG_LABELS.INPUT_LABEL}
           aria-controls={availableTags.length > 0 ? `${finalId}-available-tags` : undefined}
         />
-      }
+      )}
     >
       {/* Render the rest of the TagInput UI as children of FieldLayout */}
       <div className="flex flex-col gap-3 p-3 border border-gray-200 rounded-md bg-white"> {/* This div now acts as the children */}
