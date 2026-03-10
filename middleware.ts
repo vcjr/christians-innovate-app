@@ -36,21 +36,14 @@ export async function middleware(request: NextRequest) {
           })
         },
         remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+          // Pillar: Maintenance - Use native Next.js delete method
+          request.cookies.delete(name)
           response = NextResponse.next({
             request: {
               headers: request.headers,
             },
           })
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
+          response.cookies.delete(name)
         },
       },
     }
@@ -76,6 +69,43 @@ export async function middleware(request: NextRequest) {
     const hasCompletedOnboarding = user.user_metadata?.has_completed_onboarding === true;
     if (!hasCompletedOnboarding) {
       return NextResponse.redirect(new URL('/onboarding', request.url));
+    }
+  }
+
+  // 4. Step Resumption: If on onboarding root without a step, redirect to the last known step
+  if (isOnboardingRoute && !isSuccessPage && !request.nextUrl.searchParams.has('step')) {
+    const stepCookie = request.cookies.get('onboarding_step')?.value;
+    if (stepCookie) {
+      const step = parseInt(stepCookie, 10);
+      if (!isNaN(step) && step >= 0) {
+        const url = request.nextUrl.clone();
+        url.searchParams.set('step', stepCookie);
+        return NextResponse.redirect(url);
+      }
+    }
+  }
+
+  // 5. Unified Completion Guard (Iron Gate): Seal the funnel once finished
+  if (user && isOnboardingRoute) {
+    const hasCompletedOnboarding = user.user_metadata?.has_completed_onboarding === true;
+    const hasSuccessAuth = request.cookies.get('sb_success_auth')?.value === 'true';
+
+    // Scenario A: Attempting to access success page without a valid one-time token
+    // Scenario B: Attempting to access any other onboarding route after completion
+    const isUnauthorizedSuccess = isSuccessPage && !hasSuccessAuth;
+    const isReenteringFunnel = !isSuccessPage && hasCompletedOnboarding;
+
+    if (isUnauthorizedSuccess || isReenteringFunnel) {
+      const redirectResponse = NextResponse.redirect(new URL('/dashboard', request.url));
+      
+      // Pillar: Reliability - Sync Supabase cookies to the redirect response
+      response.cookies.getAll().forEach((cookie) => {
+        redirectResponse.cookies.set(cookie.name, cookie.value, cookie);
+      });
+
+      // Pillar: Security - Use a server-set cookie instead of forgeable URL params
+      redirectResponse.cookies.set('next_notice', 'onboarding_complete', { path: '/', sameSite: 'lax', httpOnly: false });
+      return redirectResponse;
     }
   }
 

@@ -18,13 +18,20 @@ jest.mock('next/server', () => {
         cookies: { 
           set: jest.fn(), 
           get: jest.fn(), 
-          remove: jest.fn() 
+          getAll: jest.fn().mockReturnValue([]),
+          delete: jest.fn() 
         },
-        headers: new Headers(),
+        headers: new Headers() as Headers,
       })),
       redirect: jest.fn().mockImplementation((url) => ({
         url,
-        headers: new Headers({ location: url.toString() }),
+        headers: new Headers({ location: url.toString() }) as Headers,
+        cookies: {
+          set: jest.fn(),
+          get: jest.fn(),
+          getAll: jest.fn().mockReturnValue([]),
+          delete: jest.fn()
+        }
       })),
     },
   };
@@ -44,10 +51,19 @@ describe('Middleware Guardrail', () => {
     });
   });
 
-  const createRequest = (path: string) => {
-    return new NextRequest(new URL(`http://localhost${path}`), {
-      headers: new Headers(),
-    });
+  const createRequest = (path: string, headers: Record<string, string> = {}, cookies: Record<string, string> = {}) => {
+    const url = new URL(`http://localhost${path}`);
+    const h = new Headers(headers);
+    
+    // Pillar: Reliability - NextRequest parses cookies from the 'Cookie' header.
+    // We must format the cookies object into a standard semicolon-separated string.
+    const cookieString = Object.entries(cookies)
+      .map(([key, val]) => `${key}=${val}`)
+      .join('; ');
+    
+    if (cookieString) h.set('Cookie', cookieString);
+
+    return new NextRequest(url, { headers: h });
   };
 
   it('redirects unauthenticated users to /login for protected routes', async () => {
@@ -102,11 +118,73 @@ describe('Middleware Guardrail', () => {
     mockGetUser.mockResolvedValue({
       data: { user: { user_metadata: { has_completed_onboarding: false } } },
     });
-    const req = createRequest('/onboarding/success');
+    // Pillar: Security - The success page is a privileged route that requires the one-time token.
+    const req = createRequest('/onboarding/success', {}, { sb_success_auth: 'true' });
     
     await middleware(req);
     
     expect(NextResponse.next).toHaveBeenCalled();
     expect(NextResponse.redirect).not.toHaveBeenCalled();
+  });
+
+  it('redirects completed users to dashboard regardless of referer (Iron Gate)', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { user_metadata: { has_completed_onboarding: true } } },
+    });
+    // Even with a valid internal referer, we now force dashboard to break loops
+    const req = createRequest('/onboarding', {
+      referer: 'http://localhost/previous-page',
+    });
+    
+    const res = await middleware(req) as any;
+    
+    expect(NextResponse.redirect).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/dashboard' })
+    );
+    
+    // Pillar: Security - Ensure the notice is still triggered
+    expect(res.cookies.set).toHaveBeenCalledWith(
+      'next_notice',
+      'onboarding_complete',
+      expect.objectContaining({ httpOnly: false, sameSite: 'lax' })
+    );
+  });
+
+  it('redirects completed users to dashboard for direct entries', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { user_metadata: { has_completed_onboarding: true } } },
+    });
+    const req = createRequest('/onboarding');
+    
+    await middleware(req);
+    
+    expect(NextResponse.redirect).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/dashboard' })
+    );
+  });
+
+  it('allows completed users to view the success page only with a valid auth cookie', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { user_metadata: { has_completed_onboarding: true } } },
+    });
+    const req = createRequest('/onboarding/success', {}, { sb_success_auth: 'true' });
+    
+    await middleware(req);
+    
+    expect(NextResponse.next).toHaveBeenCalled();
+    expect(NextResponse.redirect).not.toHaveBeenCalled();
+  });
+
+  it('redirects completed users away from success page if no auth cookie is present (One-Time Guard)', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { user_metadata: { has_completed_onboarding: true } } },
+    });
+    const req = createRequest('/onboarding/success'); // No sb_success_auth cookie
+    
+    await middleware(req);
+    
+    expect(NextResponse.redirect).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/dashboard' })
+    );
   });
 });
