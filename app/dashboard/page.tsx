@@ -1,7 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { unsubscribeFromPlan } from './actions'
-import { getAllCalendarDays, getPlanDays } from './actions'
+import { unsubscribeFromPlan, getAllCalendarDays, getPlanDays } from './actions'
 import { SubscribeButton } from './subscribe-button'
 import { ReadingProgress } from './reading-progress'
 import { CalendarView } from './calendar-view'
