@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+import type { CalendarDay, PlanDay } from './types'
 
-export async function getAllCalendarDays(planId: string) {
+export async function getAllCalendarDays(planId: string): Promise<{ days: CalendarDay[]; error?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { days: [], error: 'Not authenticated' }
@@ -21,10 +22,10 @@ export async function getAllCalendarDays(planId: string) {
     return { days: [], error: error.message }
   }
 
-  return { days: days || [] }
+  return { days: (days || []) as CalendarDay[] }
 }
 
-export async function getPlanDays(planId: string, page: number = 0, pageSize: number = 10) {
+export async function getPlanDays(planId: string, page: number = 0, pageSize: number = 10): Promise<{ days: PlanDay[]; hasMore: boolean }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { days: [], hasMore: false }
@@ -42,7 +43,7 @@ export async function getPlanDays(planId: string, page: number = 0, pageSize: nu
   if (error || !days) return { days: [], hasMore: false }
 
   const hasMore = days.length > pageSize
-  return { days: days.slice(0, pageSize), hasMore }
+  return { days: days.slice(0, pageSize) as PlanDay[], hasMore }
 }
 
 export async function toggleProgress(formData: FormData) {

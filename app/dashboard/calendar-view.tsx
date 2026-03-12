@@ -3,14 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { ChevronLeft, ChevronRight, BookOpen, CheckCircle2 } from 'lucide-react'
-
-type MonthDay = {
-  id: string
-  day_number: number
-  date_assigned: string | null
-  scripture_reference: string
-  user_progress: Array<{ is_completed: boolean }> | null
-}
+import type { CalendarDay } from './types'
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -20,14 +13,14 @@ const MONTH_NAMES = [
 ]
 
 interface CalendarViewProps {
-  allDays: MonthDay[]
+  allDays: CalendarDay[]
 }
 
 /**
  * Find today's date if it falls within the plan range,
  * otherwise default to the first day in the plan.
  */
-function getInitialMonth(allDays: MonthDay[]): { year: number; month: number } {
+function getInitialMonth(allDays: CalendarDay[]): { year: number; month: number } {
   const now = new Date()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
@@ -65,7 +58,7 @@ export function CalendarView({ allDays }: CalendarViewProps) {
 
   // Pre-compute a full date->day lookup once from allDays
   const dayMap = useMemo(() => {
-    const map = new Map<string, MonthDay>()
+    const map = new Map<string, CalendarDay>()
     for (const d of allDays) {
       if (d.date_assigned) {
         map.set(d.date_assigned, d)
@@ -76,7 +69,7 @@ export function CalendarView({ allDays }: CalendarViewProps) {
 
   // Lookup by id for the selected detail bar
   const dayById = useMemo(() => {
-    const map = new Map<string, MonthDay>()
+    const map = new Map<string, CalendarDay>()
     for (const d of allDays) map.set(d.id, d)
     return map
   }, [allDays])
@@ -115,7 +108,7 @@ export function CalendarView({ allDays }: CalendarViewProps) {
 
   const monthReadingsCount = cells.filter((c) => c && dayMap.has(c.dateStr)).length
 
-  const handleCellClick = (planDay: MonthDay | undefined) => {
+  const handleCellClick = (planDay: CalendarDay | undefined) => {
     if (!planDay) return
     setSelectedId((prev) => (prev === planDay.id ? null : planDay.id))
   }
@@ -168,7 +161,7 @@ export function CalendarView({ allDays }: CalendarViewProps) {
               return (
                 <div
                   key={`empty-${idx}`}
-                  className="h-16 sm:h-18 border-r border-b border-gray-50 bg-gray-50/30"
+                  className="h-16 sm:h-[72px] border-r border-b border-gray-50 bg-gray-50/30"
                 />
               )
             }
@@ -179,34 +172,34 @@ export function CalendarView({ allDays }: CalendarViewProps) {
             const isPast = cell.dateStr < todayStr
             const isSelected = planDay?.id === selectedId
 
-            return (
-              <div
-                key={cell.dateStr}
-                onClick={() => handleCellClick(planDay)}
-                className={[
-                  'relative h-16 sm:h-18 border-r border-b border-gray-100 flex flex-col items-center justify-start pt-1.5 px-0.5 transition-colors',
-                  planDay ? 'cursor-pointer hover:bg-blue-50/50 active:bg-blue-100/50' : '',
-                  isToday && !planDay ? 'bg-blue-50/60' : '',
-                  isToday && planDay && !isSelected ? 'bg-blue-50/60' : '',
-                  isSelected ? 'bg-blue-100 ring-2 ring-inset ring-blue-500' : '',
-                ].filter(Boolean).join(' ')}
-              >
-                {/* Day number */}
-                <span
+            if (planDay) {
+              return (
+                <button
+                  key={cell.dateStr}
+                  type="button"
+                  onClick={() => handleCellClick(planDay)}
+                  aria-label={`${MONTH_NAMES[month - 1]} ${cell.date}: Day ${planDay.day_number}, ${planDay.scripture_reference}${isCompleted ? ', completed' : ''}`}
+                  aria-pressed={isSelected}
                   className={[
-                    'text-xs sm:text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full leading-none',
-                    isToday
-                      ? 'bg-blue-600 text-white font-semibold'
-                      : isPast && !planDay
-                        ? 'text-gray-300'
-                        : 'text-gray-700',
-                  ].join(' ')}
+                    'relative h-16 sm:h-[72px] border-r border-b border-gray-100 flex flex-col items-center justify-start pt-1.5 px-0.5 transition-colors',
+                    'cursor-pointer hover:bg-blue-50/50 active:bg-blue-100/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500',
+                    isToday && !isSelected ? 'bg-blue-50/60' : '',
+                    isSelected ? 'bg-blue-100 ring-2 ring-inset ring-blue-500' : '',
+                  ].filter(Boolean).join(' ')}
                 >
-                  {cell.date}
-                </span>
+                  {/* Day number */}
+                  <span
+                    className={[
+                      'text-xs sm:text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full leading-none',
+                      isToday
+                        ? 'bg-blue-600 text-white font-semibold'
+                        : 'text-gray-700',
+                    ].join(' ')}
+                  >
+                    {cell.date}
+                  </span>
 
-                {/* Plan day indicator */}
-                {planDay && (
+                  {/* Plan day indicator */}
                   <div className="mt-0.5 flex flex-col items-center gap-0.5 w-full px-1">
                     <div
                       className={[
@@ -218,7 +211,31 @@ export function CalendarView({ allDays }: CalendarViewProps) {
                       Day {planDay.day_number}
                     </span>
                   </div>
-                )}
+                </button>
+              )
+            }
+
+            return (
+              <div
+                key={cell.dateStr}
+                className={[
+                  'relative h-16 sm:h-[72px] border-r border-b border-gray-100 flex flex-col items-center justify-start pt-1.5 px-0.5',
+                  isToday ? 'bg-blue-50/60' : '',
+                ].filter(Boolean).join(' ')}
+              >
+                {/* Day number */}
+                <span
+                  className={[
+                    'text-xs sm:text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full leading-none',
+                    isToday
+                      ? 'bg-blue-600 text-white font-semibold'
+                      : isPast
+                        ? 'text-gray-300'
+                        : 'text-gray-700',
+                  ].join(' ')}
+                >
+                  {cell.date}
+                </span>
               </div>
             )
           })}
@@ -226,7 +243,7 @@ export function CalendarView({ allDays }: CalendarViewProps) {
 
         {/* Selected day detail bar */}
         {selectedDay && (
-          <div className="border-t border-blue-200 bg-blue-50 px-4 py-3 flex items-center gap-3 animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="border-t border-blue-200 bg-blue-50 px-4 py-3 flex items-center gap-3 transition-all duration-150">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
                 <span className="text-sm font-semibold text-gray-900">Day {selectedDay.day_number}</span>
@@ -267,7 +284,10 @@ export function CalendarView({ allDays }: CalendarViewProps) {
             Not yet read
           </div>
           <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[9px] text-white font-semibold">5</div>
+            <div
+              className="w-5 h-5 rounded-full bg-blue-600"
+              aria-hidden="true"
+            />
             Today
           </div>
           <div className="ml-auto text-xs text-gray-400">Tap a day to see details</div>
