@@ -7,6 +7,7 @@ import { ReadingProgress } from './reading-progress'
 import { CalendarView } from './calendar-view'
 import { ViewToggle } from './view-toggle'
 import { LaunchPrayerPreview } from './launch-prayer-preview'
+import type { CalendarDay, PlanDay } from './types'
 
 export default async function Dashboard({
   searchParams,
@@ -43,8 +44,8 @@ export default async function Dashboard({
 
   // 4. If subscribed, fetch plan details + view-specific data
   let currentPlan = null
-  let calendarData: { days: unknown[] } = { days: [] }
-  let listData: { days: unknown[]; hasMore: boolean } = { days: [], hasMore: false }
+  let calendarData: { days: CalendarDay[] } = { days: [] }
+  let listData: { days: PlanDay[]; hasMore: boolean } = { days: [], hasMore: false }
 
   if (subscribedPlanIds.length > 0) {
     const activePlanId = subscribedPlanIds[0]
@@ -58,9 +59,14 @@ export default async function Dashboard({
     currentPlan = plan
 
     if (view === 'calendar') {
-      calendarData = await getAllCalendarDays(activePlanId)
+      const calendarResult = await getAllCalendarDays(activePlanId)
+      if (calendarResult.error) {
+        throw new Error(calendarResult.error)
+      }
+      calendarData = { days: calendarResult.days }
     } else {
-      listData = await getPlanDays(activePlanId, 0, 10)
+      const listResult = await getPlanDays(activePlanId, 0, 10)
+      listData = { days: listResult.days, hasMore: listResult.hasMore }
     }
   }
 
@@ -142,16 +148,14 @@ export default async function Dashboard({
             {/* Calendar view */}
             {view === 'calendar' && (
               <CalendarView
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                allDays={calendarData.days as any[]}
+                allDays={calendarData.days}
               />
             )}
 
             {/* List view with infinite scroll */}
             {view === 'list' && (
               <ReadingProgress
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                initialDays={listData.days as any[]}
+                initialDays={listData.days}
                 planId={currentPlan.id}
                 hasMore={listData.hasMore}
               />

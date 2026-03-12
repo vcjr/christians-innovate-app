@@ -5,18 +5,9 @@ import { DayCard } from './day-card'
 import { SortControls } from './sort-controls'
 import { ArrowRight } from 'lucide-react'
 import { getPlanDays } from './actions'
+import type { PlanDay } from './types'
 
 type SortOption = 'newest' | 'oldest' | 'day-asc' | 'day-desc'
-
-interface PlanDay {
-  id: string
-  day_number: number
-  date_assigned: string | null
-  scripture_reference: string
-  content_markdown: string | null
-  created_at: string
-  user_progress?: Array<{ is_completed: boolean }>
-}
 
 interface ReadingProgressProps {
   initialDays: PlanDay[]
@@ -31,21 +22,27 @@ export function ReadingProgress({ initialDays, planId, hasMore: initialHasMore }
   const [isLoading, setIsLoading] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('day-asc')
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const isLoadingRef = useRef(false)
 
   const nextIncompleteDay = [...days]
     .sort((a, b) => a.day_number - b.day_number)
     .find((day) => !day.user_progress?.[0]?.is_completed)
 
   const loadMore = useCallback(async () => {
-    if (isLoading || !hasMore) return
+    if (isLoadingRef.current || !hasMore) return
+    isLoadingRef.current = true
     setIsLoading(true)
     const nextPage = page + 1
-    const result = await getPlanDays(planId, nextPage, 10)
-    setDays((prev) => [...prev, ...(result.days as PlanDay[])])
-    setHasMore(result.hasMore)
-    setPage(nextPage)
-    setIsLoading(false)
-  }, [isLoading, hasMore, page, planId])
+    try {
+      const result = await getPlanDays(planId, nextPage, 10)
+      setDays((prev) => [...prev, ...result.days])
+      setHasMore(result.hasMore)
+      setPage(nextPage)
+    } finally {
+      isLoadingRef.current = false
+      setIsLoading(false)
+    }
+  }, [hasMore, page, planId])
 
   useEffect(() => {
     const sentinel = sentinelRef.current
