@@ -35,8 +35,7 @@ async function checkBibleAccess() {
     process.exit(1)
   }
 
-  console.log('🔍 Checking Bible access for your API key...\n')
-  console.log(`API Key (first 10 chars): ${BIBLE_API_KEY.substring(0, 10)}...\n`)
+  console.log('🔍 Checking Bible access using the configured API key...\n')
 
   try {
     const response = await fetch('https://rest.api.bible/v1/bibles', {
