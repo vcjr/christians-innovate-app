@@ -1,36 +1,5 @@
 {
   "$schema": "https://unpkg.com/release-it/schema/release-it.json",
-  "plugins": {
-    "@release-it/conventional-changelog": {
-      "preset": {
-        "name": "conventionalcommits",
-        "types": [
-          {
-            "type": "feat",
-            "section": "### Added"
-          },
-          {
-            "type": "fix",
-            "section": "### Fixed"
-          },
-          {
-            "type": "perf",
-            "section": "### Changed"
-          },
-          {
-            "type": "revert",
-            "section": "### Reverted"
-          },
-          {
-            "type": "security",
-            "section": "### Security"
-          }
-        ]
-      },
-      "infile": "CHANGELOG.md",
-      "header": "# Changelog\n\nAll notable changes to **Christians Innovate App** will be documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n"
-    }
-  },
   "git": {
     "commitMessage": "chore(release): v${version}",
     "tagName": "v${version}",
@@ -38,9 +7,15 @@
   },
   "github": {
     "release": true,
-    "releaseName": "v${version}"
+    "releaseName": "v${version} — Christians Innovate App",
+    "releaseNotes": "scripts/extract-release-notes.sh ${version}"
   },
   "npm": {
     "publish": false
+  },
+  "hooks": {
+    "before:init": "echo '⛪ Preparing release v${version}...'",
+    "after:bump": "echo '📦 Version bumped to ${version}'",
+    "after:release": "echo '🎉 Release v${version} published! Thank you volunteers!'"
   }
 }

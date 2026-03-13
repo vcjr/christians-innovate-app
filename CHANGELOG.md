@@ -16,6 +16,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-03-12
+
+### Volunteer Contributions
+
+> Every feature and fix in this release was made possible by our amazing volunteers.
+> Thank you for your time, talent, and dedication to the community!
+
+---
+
+#### Victor Crispin — [@vcjr](https://github.com/vcjr)
+
+**Dashboard Calendar View** — [PR #14](https://github.com/vcjr/christians-innovate-app/pull/14) · CI-34
+
+A brand-new condensed calendar view that lets users see their reading plan progress at a glance. Includes a view toggle to switch between the existing day-card layout and the new calendar, plus enhanced reading-progress indicators.
+
+- New components: `calendar-view.tsx`, `view-toggle.tsx`
+- Expanded types and updated dashboard actions to support calendar data
+- Accessibility, type-safety, and Tailwind CSS improvements applied after code review
+
+**Bible Plan Day Navigation** — [PR #15](https://github.com/vcjr/christians-innovate-app/pull/15) · CI-31
+
+Navigate between plan days with previous/next controls and full keyboard-shortcut support, providing a seamless reading plan experience.
+
+- New component: `day-navigation.tsx` with keyboard arrow-key controls
+- Updated plan-day page to integrate navigation
+- Improved Supabase sibling queries with `maybeSingle`, plus `e.repeat` guard and `e.preventDefault` in keyboard handler
+
+**Launch Prayer Preview Fix** — [PR #16](https://github.com/vcjr/christians-innovate-app/pull/16) · CI-35
+
+Fixed data fetching in the dashboard launch-prayer-preview widget so it correctly displays recent prayer posts.
+
+---
+
+#### Justin H — [@JustinhSE](https://github.com/JustinhSE)
+
+**TypeScript CI Pipeline** — [PR #12](https://github.com/vcjr/christians-innovate-app/pull/12) · CI-29
+
+Added automated TypeScript type-checking to the CI workflow, catching type errors on every push and helping maintain code quality across the project.
+
+- New CI step for `tsc --noEmit` validation
+- Updated Node.js version in CI workflow
+- Dashboard page type fixes to pass strict checking
+
+---
+
+### Summary
+
+| Category          | Details                                            |
+| ----------------- | -------------------------------------------------- |
+| **New features**  | Dashboard calendar view, Bible plan day navigation |
+| **Bug fixes**     | Launch prayer preview data                         |
+| **DevOps**        | TypeScript CI pipeline, Node.js CI update          |
+| **Files changed** | 9 files · +735 lines added · −60 lines removed     |
+
+---
+
 ## [0.2.0] - 2026-03-09
 
 ### Added
@@ -85,6 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/vcjr/christians-innovate-app/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/vcjr/christians-innovate-app/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vcjr/christians-innovate-app/releases/tag/v0.1.0
