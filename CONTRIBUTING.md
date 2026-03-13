@@ -4,58 +4,36 @@ Welcome! Here are the guidelines to ensure every contribution is clearly tracked
 
 ---
 
-## Commit Message Convention
+## Commit Messages
 
-We use [Conventional Commits](https://www.conventionalcommits.org/). This allows us to auto-generate the `CHANGELOG.md` and bump versions automatically.
+Write clear, descriptive commit messages that explain **what** was changed and **why**. Prefix with the JIRA ticket ID when applicable.
 
 ### Format
 
 ```
-<type>(<scope>): <short description>
-
-[optional body]
-
-[optional footer: closes #issue, co-authored-by, etc.]
+CI-XX brief description of the change
 ```
 
-### Types
+### Scopes (optional)
 
-| Type       | What it means                        | Appears in changelog? |
-| ---------- | ------------------------------------ | --------------------- |
-| `feat`     | A new feature                        | ✅ Yes — Added         |
-| `fix`      | A bug fix                            | ✅ Yes — Fixed         |
-| `perf`     | A performance improvement            | ✅ Yes — Changed       |
-| `refactor` | Code restructure, no behavior change | ❌ No                  |
-| `docs`     | Documentation only                   | ❌ No                  |
-| `style`    | Formatting, whitespace               | ❌ No                  |
-| `test`     | Tests                                | ❌ No                  |
-| `chore`    | Build process, dependency updates    | ❌ No                  |
-| `security` | Security patches                     | ✅ Yes — Security      |
-| `revert`   | Revert a previous commit             | ✅ Yes                 |
-
-> **Breaking changes:** Add `!` after the type (e.g., `feat!:`) or add `BREAKING CHANGE:` in the footer. This triggers a major version bump.
-
-### Scopes (optional but recommended)
-
-Use a scope to indicate which area of the app is affected:
+You can optionally include a scope to indicate which area of the app is affected:
 
 `admin`, `dashboard`, `plans`, `meetings`, `directory`, `auth`, `bible`, `email`, `pwa`, `db`, `api`
 
 ### Examples
 
 ```bash
-feat(meetings): add timezone selection to meeting creation form
-fix(dashboard): correct verse display for multi-chapter ranges
-chore(deps): bump next from 16.1.3 to 16.1.5
-feat!: replace launch prayer feed with new moderation system
-docs: update README with local setup instructions
+CI-34 add calendar view to dashboard
+CI-35 fix data for launch-prayer-preview component
+CI-29 set up TypeScript CI validation
+update Node.js version in CI workflow
 ```
 
 ---
 
 ## Attribution in the Changelog
 
-We use a **volunteer-centric** changelog format. Each release groups contributions **by person**, not just by commit type. This ensures every volunteer's work is visible and celebrated.
+We use a **volunteer-centric** changelog format. Each release groups contributions **by person**, not just by change type. This ensures every volunteer's work is visible and celebrated.
 
 When your PR is merged, the project lead will add your entry to the `[Unreleased]` section of `CHANGELOG.md` using this format:
 
@@ -98,7 +76,7 @@ The GitHub release body is automatically extracted from `CHANGELOG.md` via `scri
 
 ## Pull Request Checklist
 
-- [ ] Commit messages follow Conventional Commits
+- [ ] Commit messages are clear and include the JIRA ticket ID
 - [ ] PR description includes a summary, your name, and JIRA ticket for changelog attribution
 - [ ] No `console.log` of sensitive data
 - [ ] TypeScript types are correct (no `any` unless justified)
