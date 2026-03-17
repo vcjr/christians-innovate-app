@@ -5,6 +5,7 @@ import { LayoutDashboard, Shield, LogOut, Users, Rocket, FolderOpen } from 'luci
 import { signOut } from './actions'
 import { MobileMenu } from './mobile-menu'
 import { UserProfileDropdown } from './user-profile-dropdown'
+import { SignOutButton } from '@/components/auth/SignOutButton'
 
 export async function NavigationBar() {
   const supabase = await createClient()
@@ -100,15 +101,7 @@ export async function NavigationBar() {
               avatarUrl={userProfile?.avatar_url || null}
               userId={user.id}
             />
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium transition"
-              >
-                <LogOut className="h-4 w-4" />
-                Sign Out
-              </button>
-            </form>
+            <SignOutButton />
           </div>
 
           {/* Mobile Menu */}

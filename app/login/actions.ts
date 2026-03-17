@@ -40,7 +40,14 @@ export async function login(formData: FormData) {
     }
   }
 
+  // Pillar: Performance - Use metadata from the auth response to avoid extra DB queries.
+  // Pillar: UX - Proactively redirect to the correct landing page to prevent "double-click" URL mismatch.
+  const hasCompletedOnboarding = authData.user?.user_metadata?.has_completed_onboarding === true
+
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  
+  // If onboarding is not complete, send them straight to the funnel.
+  // Otherwise, proceed to the dashboard.
+  redirect(hasCompletedOnboarding ? '/dashboard' : '/onboarding')
 }
 
