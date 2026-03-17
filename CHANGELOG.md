@@ -16,6 +16,146 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-03-17
+
+### Volunteer Contributions
+
+> Every feature and fix in this release was made possible by our amazing volunteers.
+> Thank you for your time, talent, and dedication to the community!
+
+---
+
+#### Elie Paul — [@EliePaulDev](https://github.com/EliePaulDev)
+
+**Multi-Step Onboarding Flow** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+A complete, multi-step onboarding experience for new users. Takes members through profile setup covering bio, photo upload, skills, interests, community preferences, and social links — with form state persisted to localStorage and IndexedDB so no data is lost on refresh.
+
+- New pages: `app/onboarding/page.tsx`, `app/onboarding/success/page.tsx`, `app/onboarding/WelcomeStep.tsx`
+- Centralized step config via `app/onboarding/onboarding.ts` (ONBOARDING_STEPS)
+- `useOnboarding` controller hook: step validation, parallel file uploads, atomic submission, session refresh, LocalStorage & cookie cleanup
+- `useStepper` hook: URL-synchronized step navigation with anti-skip guardrails and A11y focus management
+- Onboarding completion flag (`has_completed_onboarding`) written to both `user_profiles` and Supabase Auth metadata
+- New server action: `lib/actions/onboarding.ts` (`completeOnboardingAction`) with atomic DB upsert + auth metadata sync
+- DB migration to add `has_completed_onboarding` column to user profiles table
+
+**Auth & Middleware** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+End-to-end auth flow updates ensuring users complete onboarding before accessing the app.
+
+- Auth middleware guardrail: redirects unauthenticated users to login and incomplete-onboarding users to `/onboarding`
+- Login action updated to read `has_completed_onboarding` from auth metadata and redirect accordingly
+- Signup action updated: initializes `has_completed_onboarding: false` in metadata, redirects confirmed users to `/onboarding`
+- `clearLocalSessionData` cleanup utility for secure sign-out and state purging
+
+**Secure Sign-Out (`SignOutButton`)** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+Replaced the bare sign-out form in the navigation bar with a dedicated `SignOutButton` component that clears localStorage and IndexedDB before triggering the server-side session invalidation, preventing stale data leakage.
+
+- New component: `components/auth/SignOutButton.tsx` with pending/loading state
+- Fully tested: verifies cleanup order and disabled state during sign-out
+
+**Flash Notice System (`NoticeHandler`)** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+A cookie-driven flash notification system that displays contextual toast messages (success, info, warning, error) set by middleware or server actions. Messages are driven by a secure registry (`NOTICE_REGISTRY`) to prevent injection.
+
+- `NoticeHandler` injected into root layout for app-wide coverage
+- Auto-dismisses via CSS `shrink` animation; hover pauses the timer; accessible close button
+- Role-appropriate ARIA: `role="status"` for success/info, `role="alert"` for warning/error
+- Fully tested: cookie flash-and-purge logic, hover pause/resume, dismiss behavior, security registry guard
+
+**Reusable Component Library** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+Seven new accessible, tested UI components extracted from the onboarding flow and available app-wide.
+
+- `Card` — composable card with optional title/footer slots
+- `CheckboxGroup` — accessible checkbox group using `fieldset`/`legend` with `aria-describedby` wiring
+- `DynamicInput` — polymorphic input (text, email, password, number, textarea, select) with ref forwarding and `aria-invalid`
+- `FieldLayout` — shared label/error/ARIA layout primitive used by all input components
+- `PhotoInput` — file input with Blob URL preview, IndexedDB persistence, and memory-safe cleanup
+- `ProgressBar` — accessible progress bar with value clamping and smooth CSS transitions
+- `TagInput` — combobox tag selector with case-insensitive deduplication, initialTags casing priority, custom tag entry (Title Case), max-tag enforcement, and keyboard accessibility
+
+**Shared Hooks** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+Four reusable hooks extracted for use beyond onboarding.
+
+- `useFilePreview` — manages Blob URL lifecycle (creation, replacement, and cleanup on unmount)
+- `useFormPersistence` — hybrid serializable-to-localStorage / binary-to-IndexedDB form persistence with rehydration and clear
+- `useProfile` — shared profile state manager with optimistic local updates and server action integration
+- `useStepper` — generic multi-step navigation hook (URL sync, guardrails, progress, A11y)
+
+**Test Infrastructure & Coverage** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+Full Jest testing setup wired to the project for the first time, with comprehensive test coverage across the new work.
+
+- `jest.config.ts` and `jest.setup.ts` bootstrapped with `next/jest`, jsdom, `@testing-library/jest-dom`, and path alias support
+- Tests for all seven components (Card, CheckboxGroup, DynamicInput, FieldLayout, PhotoInput, ProgressBar, TagInput)
+- Tests for all four hooks (useFilePreview, useFormPersistence, useProfile, useStepper)
+- Tests for `useOnboarding`, `OnboardingPage`, `SuccessPage`, and `signup` server action
+- Tests for `completeOnboardingAction` verifying atomic DB + auth metadata sync
+
+**Utility & Type Additions** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+- `UserProfile` type (`types/profile.ts`) — shared exportable profile type
+- `NOTICE_REGISTRY` type (`types/notices.ts`) — registry for flash notice slugs
+- `isFile` type guard (`utils/type-guards.ts`) — runtime File instance check
+- `validation.ts` utility functions
+- `filePersistence` utility — IndexedDB-backed file storage for form persistence
+
+---
+
+#### Caleb Matteis — [@bluecollarcoders](https://github.com/bluecollarcoders)
+
+**Auto-Subscription Feature** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19) · CI-1
+
+Admins can now designate a default reading plan directly from the plan list. New users who opt into Bible Year during signup are automatically subscribed to the default plan.
+
+- New `setDefaultPlan` server action using a `set_default_plan_atomic` RPC to prevent race conditions
+- Star button (`⭐`) inline in `plan-list.tsx` with loading state, visual distinction, and accessible `title` attributes
+- `is_default` field surfaced in the plan list type
+- Fixed `health_timeout` causing CI/CD pipeline errors in Supabase config
+
+---
+
+#### Victor Crispin — [@vcjr](https://github.com/vcjr)
+
+**Dashboard: Auto-Subscription Edge Case** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+A graceful warning is shown when `bible_year` is enabled in the user profile but no plan subscription was created (e.g., trigger failure), guiding the user to pick a plan manually.
+
+**Fix: Unsafe URL Injection** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+Sanitized URL handling in PhotoInput to prevent `javascript:` or `data:` scheme injection via Blob URL validation.
+
+**Fix: Onboarding New-User Trigger** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+Silenced PGRST116 errors for new users who haven't completed onboarding yet, preventing false error states on first login.
+
+**README & Release Tooling** — [PR #19](https://github.com/vcjr/christians-innovate-app/pull/19)
+
+- README expanded with prerequisites, local Supabase setup (Option A/B), project structure, available scripts, database management commands, and a troubleshooting section
+- `release-it` config simplified: removed conventional-changelog plugin dependency, GitHub release body now auto-extracted from `CHANGELOG.md` via `scripts/extract-release-notes.sh`
+- `CONTRIBUTING.md` updated to reflect volunteer-centric commit and changelog workflow
+- `.gitignore` extended with `MENTORSHIP_GUIDE.md` and `supabase/snippets/`
+
+---
+
+### Summary
+
+| Category          | Details                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| **New features**  | Multi-step onboarding, auto-subscription with default plan, flash notice system, secure sign-out              |
+| **Bug fixes**     | Unsafe URL injection, onboarding new-user trigger (PGRST116), auto-subscription edge-case warning             |
+| **Auth**          | Middleware guardrails, smart login/signup redirects, secure session cleanup                                   |
+| **Components**    | Card, CheckboxGroup, DynamicInput, FieldLayout, PhotoInput, ProgressBar, TagInput                             |
+| **Hooks**         | useFilePreview, useFormPersistence, useProfile, useStepper                                                    |
+| **Testing**       | Jest infrastructure, 40+ tests across components, hooks, pages, and server actions                            |
+| **DevOps / Docs** | README overhaul, release tooling update, CONTRIBUTING.md refresh, .gitignore additions, CI health_timeout fix |
+| **Files changed** | ~55 files · +3 800 lines added · −110 lines removed                                                           |
+
+---
+
 ## [0.3.0] - 2026-03-12
 
 ### Volunteer Contributions
@@ -132,16 +272,18 @@ Added automated TypeScript type-checking to the CI workflow, catching type error
 
 ## Contributors
 
-| Name           | GitHub                                             | Role           |
-| -------------- | -------------------------------------------------- | -------------- |
-| Victor Crispin | [@vcjr](https://github.com/vcjr)                   | Lead Developer |
-| Lidia          | [@lidiadelacruz](https://github.com/lidiadelacruz) | Developer      |
-| Justin H       | [@JustinhSE](https://github.com/JustinhSE)         | Developer      |
-| Elie Paul      | —                                                  | Developer      |
+| Name           | GitHub                                                   | Role           |
+| -------------- | -------------------------------------------------------- | -------------- |
+| Victor Crispin | [@vcjr](https://github.com/vcjr)                         | Lead Developer |
+| Lidia          | [@lidiadelacruz](https://github.com/lidiadelacruz)       | Developer      |
+| Justin H       | [@JustinhSE](https://github.com/JustinhSE)               | Developer      |
+| Elie Paul      | [@EliePaulDev](https://github.com/EliePaulDev)           | Developer      |
+| Caleb Matteis  | [@bluecollarcoders](https://github.com/bluecollarcoders) | Developer      |
 
 ---
 
-[Unreleased]: https://github.com/vcjr/christians-innovate-app/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/vcjr/christians-innovate-app/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/vcjr/christians-innovate-app/releases/tag/v0.1.0
