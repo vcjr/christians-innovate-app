@@ -55,3 +55,21 @@ export async function deletePlan(planId: string) {
   revalidatePath('/admin/plans')
   return { success: true }
 }
+
+export async function setDefaultPlan(planId: string) {
+  const supabase = await createClient();
+
+  // Use a database transaction to prevent race conditions.
+  const { data, error } = await supabase.rpc('set_default_plan_atomic', {
+    new_default_plan_id: planId
+  });
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin/plans');
+  return { success: true };
+  
+}
+

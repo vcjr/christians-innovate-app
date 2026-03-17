@@ -4,6 +4,7 @@ import "./globals.css";
 import { NavigationBar } from './navigation'
 import { createClient } from '@/utils/supabase/server'
 import { AnnouncementBar } from './announcement-bar'
+import { NoticeHandler } from '@/components/ui/NoticeHandler'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -64,6 +65,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <NoticeHandler />
         <NavigationBar />
         {activeMeeting && user && (
           <AnnouncementBar meeting={activeMeeting} userId={user.id} />

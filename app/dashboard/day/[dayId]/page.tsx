@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import { ArrowLeft, Calendar, BookOpen } from 'lucide-react'
 import { CommentSection } from './comment-section'
 import { MarkCompleteButton } from './mark-complete-button'
+import { DayNavigation } from './day-navigation'
 import Link from 'next/link'
 
 export default async function DayViewPage({
@@ -50,9 +51,44 @@ export default async function DayViewPage({
 
   const isCompleted = day.user_progress?.[0]?.is_completed || false
 
+  // Fetch sibling days and total count for navigation
+  const planId = day.reading_plans?.id
+  const [prevResult, nextResult, countResult] = await Promise.all([
+    supabase
+      .from('plan_days')
+      .select('id, day_number')
+      .eq('plan_id', planId)
+      .lt('day_number', day.day_number)
+      .order('day_number', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('plan_days')
+      .select('id, day_number')
+      .eq('plan_id', planId)
+      .gt('day_number', day.day_number)
+      .order('day_number', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('plan_days')
+      .select('id', { count: 'exact', head: true })
+      .eq('plan_id', planId),
+  ])
+
+  const prevDay = prevResult.data ?? null
+  const nextDay = nextResult.data ?? null
+  const totalDays = countResult.count ?? 0
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto p-4 sm:p-6 pt-6 sm:pt-8">
+      <DayNavigation
+        prevDay={prevDay}
+        nextDay={nextDay}
+        currentDayNumber={day.day_number}
+        totalDays={totalDays}
+      />
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 pt-6 sm:pt-8 pb-24 xl:pb-6">
         {/* Back button */}
         <Link
           href="/dashboard"

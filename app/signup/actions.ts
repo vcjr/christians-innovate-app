@@ -52,6 +52,7 @@ export async function signup(formData: FormData) {
           bible_year: bibleYear,
           skill_share: skillShare,
           referral: referral || null,
+          has_completed_onboarding: false,
         },
       },
     })
@@ -68,7 +69,7 @@ export async function signup(formData: FormData) {
     if (authData.user && authData.user.confirmed_at) {
       // User is confirmed, redirect to dashboard
       console.log('User confirmed, redirecting to dashboard')
-      redirect('/dashboard')
+      redirect('/onboarding')
     } else {
       // Email confirmation required
       console.log('Signup complete, redirecting to login')
