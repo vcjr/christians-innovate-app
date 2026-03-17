@@ -1,18 +1,31 @@
 'use client'
 
-import { deletePlan } from './actions'
+import { deletePlan, setDefaultPlan } from './actions'
 import { useState } from 'react'
-import { Trash2, Calendar, FileText } from 'lucide-react'
+import { Trash2, Calendar, FileText, Star } from 'lucide-react'
 
 type Plan = {
   id: string
   title: string
   description: string | null
   created_at: string
+  is_default: boolean
 }
 
 export function PlanList({ plans }: { plans: Plan[] }) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [updatingID, setUpdatingID] = useState<string | null>(null)
+
+  async function handleSetDefault(planId: string) {
+    setUpdatingID(planId)
+    const result = await setDefaultPlan(planId)
+
+    if (result?.error) {
+      alert('Error setting default plan: ' + result.error)
+    }
+
+    setUpdatingID(null)
+  }
 
   async function handleDelete(planId: string, planTitle: string) {
     if (!confirm(`Are you sure you want to delete "${planTitle}"? This will also delete all associated daily readings.`)) {
@@ -50,6 +63,17 @@ export function PlanList({ plans }: { plans: Plan[] }) {
           <div key={plan.id} className="px-4 sm:px-6 py-4 hover:bg-gray-50 transition">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
               <div className="flex-1 min-w-0">
+                <div className='flex items-center gap-2'>
+                  <button
+                    onClick={ () => handleSetDefault(plan.id)}
+                    disabled={updatingID === plan.id}
+                    className={`transition-colors p-1 rounded-full hover:bg-gray-200 ${
+                      plan.is_default ? 'text-yellow-500' : 'text-gray-300'
+                    }`}
+                    title={plan.is_default ? "This is the default plan" : "Make default"}
+                  >
+                    <Star className={`h-5 w-5 ${plan.is_default ? 'fill-current' : ''}`} />
+                  </button>
                 <a
                   href={`/admin/plans/${plan.id}`}
                   className="block group"
@@ -57,13 +81,16 @@ export function PlanList({ plans }: { plans: Plan[] }) {
                   <h4 className="text-base sm:text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition">
                     {plan.title}
                   </h4>
+                </a>  
+                </div>
+
                   {plan.description && (
                     <p className="text-sm sm:text-base text-gray-600 mt-1">{plan.description}</p>
                   )}
                   <p className="text-xs sm:text-sm text-gray-500 mt-2">
                     Created {new Date(plan.created_at).toLocaleDateString()}
                   </p>
-                </a>
+                
               </div>
 
               <div className="flex items-center gap-2">

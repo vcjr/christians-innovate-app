@@ -24,11 +24,24 @@ export default async function Dashboard({
   }
 
   // 2. Get user's subscriptions
-  const { data: subscriptions } = await supabase
+  const { data: subscriptions, error: subscriptionsError } = await supabase
     .from('plan_subscriptions')
     .select('plan_id')
     .eq('user_id', user.id)
 
+  if (subscriptionsError) {
+    console.error('Failed to fetch user subscriptions:', subscriptionsError)
+  }
+
+  const { data: userProfile, error: userProfileError } = await supabase
+    .from('user_profiles')
+    .select('bible_year')
+    .eq('user_id', user.id)
+    .single()
+  if (userProfileError) {
+    console.error('Failed to fetch userprofile', userProfile )
+  }
+  
   const subscribedPlanIds = subscriptions?.map(s => s.plan_id) || []
 
   // 3. If not subscribed, fetch all reading plans to show
@@ -80,10 +93,30 @@ export default async function Dashboard({
         {/* Show available plans if user has no subscription */}
         {subscribedPlanIds.length === 0 && (
           <div className="space-y-6">
-            <div>
+            {/* Check if user expected auto-subscription but it failed */}
+            {userProfile?.bible_year === true ? (
+              // Edge case: Auto-subscription failed.
+              <div>
+                  <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6'>
+                    <h3 className='text-lg font-semibold text-yellow-800 mb-2'>
+                      Setup Issue Detected
+                    </h3>
+                    <p className='text-yellow-700'>
+                      We couldn't automatically set up your Bible reading plan. 
+                      Please choose one below or contact support if this continues.
+                    </p>
+                  </div>
+                  <div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Available Reading Plans</h2>
+                    <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">Choose a reading plan to resolve this issue</p>
+                  </div>
+              </div>
+            ) : (
+              <div>
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Available Reading Plans</h2>
               <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">Choose a reading plan to begin your journey</p>
             </div>
+            )}
 
             {allPlans && allPlans.length > 0 ? (
               <div className="space-y-4">
