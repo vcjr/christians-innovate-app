@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import FieldLayout from '../FieldLayout/FieldLayout';
 import { getPersistedFile, setPersistedFile } from '@/utils/storage/filePersistence';
+
+/**
+ * Validates that the given URL is a safe blob: URL produced by URL.createObjectURL().
+ * Prevents javascript: or data: scheme URLs from reaching the img src attribute.
+ */
+function isSafeBlobUrl(url: string | null): url is string {
+  return typeof url === 'string' && /^blob:/.test(url);
+}
 
 interface PhotoInputProps {
   label: string;
@@ -15,7 +24,7 @@ interface PhotoInputProps {
  * @description A specialized input for selecting and previewing photos.
  *              Handles local Blob URL creation and cleanup for performance.
  */
-const PhotoInput: React.FC<PhotoInputProps> = ({ label, name, onChange, error, placeholder }) => {
+const PhotoInput: React.FC<PhotoInputProps> = ({ label, name, onChange, error }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,7 +55,7 @@ const PhotoInput: React.FC<PhotoInputProps> = ({ label, name, onChange, error, p
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    
+
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
@@ -70,12 +79,14 @@ const PhotoInput: React.FC<PhotoInputProps> = ({ label, name, onChange, error, p
       isGroup={false} // Pillar: A11y - Standard div/label for single file input
       renderInput={(layoutProps) => (
         <div className="flex flex-col gap-4">
-          {previewUrl && (
+          {isSafeBlobUrl(previewUrl) && (
             <div className="relative w-32 h-32 border rounded-md overflow-hidden bg-gray-50">
-              <img
+              <Image
                 src={previewUrl}
                 alt="Preview"
-                className="w-full h-full object-cover"
+                fill
+                unoptimized
+                className="object-cover"
               />
             </div>
           )}
