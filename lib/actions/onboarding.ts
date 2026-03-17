@@ -24,18 +24,20 @@ export async function completeOnboardingAction(data: Partial<UserProfile>) {
   const urlError = validateUrls(data);
   if (urlError) return { data: null, error: urlError };
 
-  // 3. Force Onboarding Completion Flag
+  // 3. Force Onboarding Completion Flag & include user_id for upsert
   const finalData = {
     ...sanitizedData,
+    user_id: user.id,
     has_completed_onboarding: true,
   };
 
   try {
     // 4. Database Mutation (user_profiles table)
+    // Use upsert to handle edge cases where the profile row doesn't exist yet
+    // (e.g., the handle_new_user trigger didn't fire or user signed up via OAuth)
     const { data: profile, error: dbError } = await supabase
       .from('user_profiles')
-      .update(finalData)
-      .eq('user_id', user.id)
+      .upsert(finalData, { onConflict: 'user_id' })
       .select()
       .single();
 
