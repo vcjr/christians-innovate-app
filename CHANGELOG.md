@@ -79,16 +79,62 @@ Moved Admin link and Sign Out out of the main nav bar and into `UserProfileDropd
 
 ---
 
+**Transactional Email System** — CI-30
+
+A full email infrastructure built on Resend, with a visual block-based template editor, scheduled delivery, and admin controls.
+
+- Migrations: `email_templates`, `email_logs`, `sender_addresses`, `scheduled_email_jobs` tables with RLS
+- `utils/email/blocks.ts` — block system with `composeEmail` / `decomposeEmail` / `renderBlock`; supports badge, hero, primary-cta, feature-grid, detail-card, two-column, stats-row, scripture, and divider blocks
+- `utils/email/scheduled-jobs.ts` — `sendEmail`, `sendBatchEmails`, `renderEmailTemplate`, job scheduler and processor
+- Admin email template editor at `/admin/email/templates` with live block picker, visual preview, subject/variable management, and save/publish flow
+- Seeded block-system versions of all four default templates: `daily-reminder`, `welcome`, `meeting-reminder`, `weekly-digest`
+
+**Admin Email Broadcast** — CI-30
+
+Admins can send a one-off email to any member segment directly from the admin panel.
+
+- `/admin/email/broadcast` page with recipient filter (all members, email-enabled, CI updates, Bible Year, skill share)
+- Live recipient count updates as filter changes
+- Template picker — choose a saved template or compose custom HTML via the block editor
+- **Test Send** — send to a single address before broadcasting to the full list; uses the admin's own profile as sample data for variable substitution; amber-styled panel with loading state and success/error feedback
+- `sendBroadcast` and `sendTestEmail` server actions; `getRecipientCount` for live count
+
+**Email Inbox (Inbound Webhooks)** — CI-30
+
+Inbound emails to the platform are received via Resend webhook and stored for admin review.
+
+- `/api/webhooks/resend-inbound` — verifies `RESEND_WEBHOOK_SECRET` HMAC signature before processing
+- Parsed inbound messages stored in `email_logs` with `direction = 'inbound'`
+
+**External Contacts** — CI-30
+
+- `external_contacts` table and migration — allows admins to store non-member email addresses for broadcast targeting
+
+**Fix: Admin Dashboard "Current: Day" Calculation** — CI-30
+
+The View Progress modal on the admin dashboard showed "Current: Day 1" for all subscribers regardless of actual progress. Fixed by calculating the current day as `max(completed day numbers) + 1` rather than finding the first sequential incomplete day, which always returned Day 1 for members who joined mid-year.
+
+**Fix: Welcome Email Feature Grid Emoji Rendering** — CI-30
+
+Feature-grid block emojis in the welcome email were rendering as a separate block-level `<p style="font-size: 22px">` element above the title instead of inline. Updated the stored template HTML and migration to place the emoji inline with the title text, matching what `renderFeatureGrid` generates.
+
+**Fix: Vercel Cron Job (Hobby Plan)** — CI-30
+
+Vercel Hobby plan only allows once-daily cron jobs. Changed the scheduler cron from `*/5 * * * *` to `0 8 * * *` (daily at 8 AM UTC) to unblock deployments without requiring a plan upgrade.
+
+---
+
 ### Summary
 
 | Category | Details |
 |---|---|
-| **New features** | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm |
-| **Bug fixes** | Stale column references, modal layout overflow, page width misalignment |
-| **Security** | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy |
+| **New features** | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm, transactional email system, broadcast with test send, inbound email inbox, external contacts |
+| **Bug fixes** | Stale column references, modal layout overflow, page width misalignment, admin "Current: Day 1" calculation, welcome email emoji rendering |
+| **Security** | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy, Resend webhook HMAC verification |
 | **Navigation** | Admin + Sign Out moved to profile dropdown |
-| **Migrations** | 4 new migration files |
-| **Files changed** | 25 files · +2 393 lines added · −483 lines removed |
+| **DevOps** | Vercel cron schedule fixed for Hobby plan |
+| **Migrations** | 16 new migration files |
+| **Files changed** | 40+ files |
 
 ---
 
