@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { User as SupabaseUser } from '@supabase/supabase-js'
-import { Camera, Save, Loader2 } from 'lucide-react'
+import { Camera, Save, Loader2, Eye, EyeOff, Check, X } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
@@ -61,8 +61,33 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Email change state
+  const [newEmail, setNewEmail] = useState('')
+  const [changingEmail, setChangingEmail] = useState(false)
+  const [emailMessage, setEmailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   const supabase = createClient()
   const router = useRouter()
+
+  const passwordRules = {
+    minLength: newPassword.length >= 8,
+    hasUppercase: /[A-Z]/.test(newPassword),
+    hasLowercase: /[a-z]/.test(newPassword),
+    hasNumber: /[0-9]/.test(newPassword),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
+  }
+  const allPasswordRulesMet = Object.values(passwordRules).every(Boolean)
+  const passwordsMatch = newPassword === confirmNewPassword && confirmNewPassword.length > 0
 
   function getInitials(name: string): string {
     if (!name) return user.email?.[0]?.toUpperCase() || 'U'
@@ -175,6 +200,76 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
     }
   }
 
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault()
+    setPasswordMessage(null)
+
+    if (!allPasswordRulesMet) {
+      setPasswordMessage({ type: 'error', text: 'New password does not meet the requirements.' })
+      return
+    }
+    if (!passwordsMatch) {
+      setPasswordMessage({ type: 'error', text: 'New passwords do not match.' })
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      // Verify current password first
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email!,
+        password: currentPassword,
+      })
+      if (signInError) {
+        setPasswordMessage({ type: 'error', text: 'Current password is incorrect.' })
+        return
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) {
+        setPasswordMessage({ type: 'error', text: error.message })
+        return
+      }
+
+      setPasswordMessage({ type: 'success', text: 'Password updated successfully.' })
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+    } catch {
+      setPasswordMessage({ type: 'error', text: 'Something went wrong. Please try again.' })
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  async function handleEmailChange(e: React.FormEvent) {
+    e.preventDefault()
+    setEmailMessage(null)
+
+    if (!newEmail || newEmail === user.email) {
+      setEmailMessage({ type: 'error', text: 'Please enter a different email address.' })
+      return
+    }
+
+    setChangingEmail(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ email: newEmail })
+      if (error) {
+        setEmailMessage({ type: 'error', text: error.message })
+        return
+      }
+      setEmailMessage({
+        type: 'success',
+        text: `Confirmation sent to ${newEmail}. Click the link in that email to complete the change.`,
+      })
+      setNewEmail('')
+    } catch {
+      setEmailMessage({ type: 'error', text: 'Something went wrong. Please try again.' })
+    } finally {
+      setChangingEmail(false)
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Avatar Section */}
@@ -246,7 +341,17 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
               disabled
               className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
             />
-            <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+            <p className="text-xs text-gray-500 mt-1">
+              To change your email address, use the{' '}
+              <button
+                type="button"
+                onClick={() => document.getElementById('change-email-section')?.scrollIntoView({ behavior: 'smooth' })}
+                className="text-blue-600 hover:underline"
+              >
+                Email Address section
+              </button>{' '}
+              below.
+            </p>
           </div>
 
           <div>
@@ -613,6 +718,159 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
             </div>
           </label>
         </div>
+      </div>
+
+      {/* Change Password */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Change Password</h2>
+        <p className="text-sm text-gray-600 mb-4">Update the password for your Christians Innovate account.</p>
+
+        <form onSubmit={handlePasswordChange} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+            <div className="relative">
+              <input
+                type={showCurrentPassword ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter your current password"
+                className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Create a new password"
+                className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {newPassword.length > 0 && (
+              <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-1">
+                {([
+                  [passwordRules.minLength, 'At least 8 characters'],
+                  [passwordRules.hasUppercase, 'One uppercase letter'],
+                  [passwordRules.hasLowercase, 'One lowercase letter'],
+                  [passwordRules.hasNumber, 'One number'],
+                  [passwordRules.hasSpecial, 'One special character'],
+                ] as [boolean, string][]).map(([met, label]) => (
+                  <div key={label} className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-gray-500'}`}>
+                    {met ? <Check className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
+                    {label}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
+            <input
+              type="password"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              placeholder="Re-enter your new password"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:border-transparent ${
+                confirmNewPassword.length > 0
+                  ? passwordsMatch
+                    ? 'border-green-400 focus:ring-green-500'
+                    : 'border-red-400 focus:ring-red-500'
+                  : 'border-gray-300 focus:ring-blue-500'
+              }`}
+              required
+            />
+            {confirmNewPassword.length > 0 && !passwordsMatch && (
+              <p className="text-xs text-red-600 mt-1">Passwords do not match.</p>
+            )}
+          </div>
+
+          {passwordMessage && (
+            <div className={`p-3 rounded-lg text-sm ${passwordMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+              {passwordMessage.text}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={changingPassword || !currentPassword || !allPasswordRulesMet || !passwordsMatch}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+            >
+              {changingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+              Update Password
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Change Email */}
+      <div id="change-email-section" className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Email Address</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Update the email address associated with your account. We'll send a confirmation link to the new address before making the change.
+        </p>
+
+        <form onSubmit={handleEmailChange} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Current email</label>
+            <input
+              type="email"
+              value={user.email || ''}
+              disabled
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New email address</label>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="your-new@email.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          {emailMessage && (
+            <div className={`p-3 rounded-lg text-sm ${emailMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+              {emailMessage.text}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={changingEmail || !newEmail}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+            >
+              {changingEmail && <Loader2 className="h-4 w-4 animate-spin" />}
+              Send Confirmation
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Message */}

@@ -53,19 +53,22 @@ export async function middleware(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname;
-  
+
   // 1. Define Route Categories
-  const isPublicRoute = ['/login', '/signup', '/auth'].some(path => pathname.startsWith(path));
+  const isPublicRoute = ['/login', '/signup', '/auth', '/forgot-password'].some(path => pathname.startsWith(path));
   const isOnboardingRoute = pathname.startsWith('/onboarding');
   const isSuccessPage = pathname === '/onboarding/success';
-  
+  // Reset password requires a valid session but must bypass the onboarding gate
+  const isResetPasswordRoute = pathname.startsWith('/reset-password');
+
   // 2. Authentication Gate: Redirect to login if no user
-  if (!user && !isPublicRoute) {
+  if (!user && !isPublicRoute && !isResetPasswordRoute) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // 3. Onboarding "Iron Gate" Funnel: Force onboarding if not completed
-  if (user && !isPublicRoute && !isOnboardingRoute && !isSuccessPage) {
+  // Reset password is exempt — users arrive here mid-session from an email link
+  if (user && !isPublicRoute && !isOnboardingRoute && !isSuccessPage && !isResetPasswordRoute) {
     const hasCompletedOnboarding = user.user_metadata?.has_completed_onboarding === true;
     if (!hasCompletedOnboarding) {
       return NextResponse.redirect(new URL('/onboarding', request.url));
