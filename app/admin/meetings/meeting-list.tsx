@@ -15,7 +15,7 @@ interface Meeting {
   is_active: boolean
   created_at: string
   attendance_count?: number
-  attendees?: any[]
+  attendees?: { user_id: string; attended_at: string; user_profiles?: { full_name: string | null; email: string | null; avatar_url: string | null } }[]
 }
 
 interface MeetingListProps {

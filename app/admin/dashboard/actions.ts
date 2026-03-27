@@ -348,7 +348,7 @@ export async function getPlanSubscribers(planId: string) {
 
   // Batch fetch all progress records for these users and this plan's days
   let progressByUserId = new Map<string, { user_id: string; day_id: string; completed_at: string | null }[]>()
-  
+
   if (planDayIds.length > 0) {
     const { data: allProgress } = await supabase
       .from('user_progress')

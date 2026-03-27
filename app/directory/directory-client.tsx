@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe } from 'lucide-react'
+import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe, UserPlus, Clock, Loader2, X, Target } from 'lucide-react'
+import { sendGroupInvitation } from '@/app/accountability/actions'
 
 interface UserProfile {
   id: string
@@ -20,12 +22,20 @@ interface UserProfile {
   website_url: string | null
 }
 
+interface OwnedGroup {
+  id: string
+  name: string
+}
+
 interface DirectoryClientProps {
   profiles: UserProfile[]
   currentUserId: string
+  ownedGroups: OwnedGroup[]
+  membershipByGroup: Record<string, string[]>
+  pendingByGroup: Record<string, string[]>
 }
 
-function getInitials(name: string | null, userId: string): string {
+function getInitials(name: string | null): string {
   if (!name) return 'U'
   const parts = name.trim().split(/\s+/)
   if (parts.length >= 2) {
@@ -34,9 +44,44 @@ function getInitials(name: string | null, userId: string): string {
   return name.substring(0, 2).toUpperCase()
 }
 
-export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProps) {
+export function DirectoryClient({ profiles, currentUserId, ownedGroups, membershipByGroup, pendingByGroup }: DirectoryClientProps) {
+  const router = useRouter()
   const [expandedSkills, setExpandedSkills] = useState<Set<string>>(new Set())
   const [expandedInterests, setExpandedInterests] = useState<Set<string>>(new Set())
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+
+  // Modal state
+  const [modalTarget, setModalTarget] = useState<{ userId: string; userName: string } | null>(null)
+  const [invitingGroupId, setInvitingGroupId] = useState<string | null>(null)
+  // Track locally sent invites: groupId -> Set of userIds
+  const [sentInvites, setSentInvites] = useState<Record<string, Set<string>>>({})
+
+  const openModal = (userId: string, userName: string) => setModalTarget({ userId, userName })
+  const closeModal = () => { setModalTarget(null); setInvitingGroupId(null) }
+
+  const handleInvite = async (groupId: string) => {
+    if (!modalTarget) return
+    setInvitingGroupId(groupId)
+    try {
+      const result = await sendGroupInvitation(modalTarget.userId, groupId)
+      if (result.error) {
+        setToastMessage({ text: result.error, type: 'error' })
+      } else {
+        setSentInvites(prev => ({
+          ...prev,
+          [groupId]: new Set([...(prev[groupId] || []), modalTarget.userId]),
+        }))
+        setToastMessage({ text: `Invitation sent to ${modalTarget.userName || 'member'}!`, type: 'success' })
+        closeModal()
+        router.refresh()
+      }
+    } catch {
+      setToastMessage({ text: 'Failed to send invitation', type: 'error' })
+    } finally {
+      setInvitingGroupId(null)
+      setTimeout(() => setToastMessage(null), 3000)
+    }
+  }
 
   const toggleSkillsExpanded = (profileId: string) => {
     setExpandedSkills(prev => {
@@ -63,6 +108,7 @@ export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProp
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
@@ -139,7 +185,7 @@ export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProp
                     />
                   ) : (
                     <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white text-xl font-semibold border-2 border-gray-100">
-                      {getInitials(profile.full_name, profile.user_id)}
+                      {getInitials(profile.full_name)}
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
@@ -262,6 +308,18 @@ export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProp
                     </div>
                   )
                 })()}
+
+                {/* Invite to Group Button */}
+                {ownedGroups.length > 0 && profile.user_id !== currentUserId && (
+                  <div className="pt-3 border-t border-gray-100 mt-3">
+                    <button
+                      onClick={() => openModal(profile.user_id, profile.full_name || 'Member')}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                    >
+                      <UserPlus className="h-4 w-4" /> Invite to Group
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -277,5 +335,70 @@ export function DirectoryClient({ profiles, currentUserId }: DirectoryClientProp
         )}
       </div>
     </div>
+
+      {/* Group picker modal */}
+      {modalTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={closeModal}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Invite to Group</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Select a group for {modalTarget.userName}</p>
+              </div>
+              <button onClick={closeModal} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-3 space-y-2 max-h-72 overflow-y-auto">
+              {ownedGroups.map(group => {
+                const isMember = (membershipByGroup[group.id] || []).includes(modalTarget.userId)
+                const isPending = (pendingByGroup[group.id] || []).includes(modalTarget.userId) || sentInvites[group.id]?.has(modalTarget.userId)
+                const disabled = isMember || isPending || invitingGroupId === group.id
+
+                return (
+                  <button
+                    key={group.id}
+                    onClick={() => !disabled && handleInvite(group.id)}
+                    disabled={disabled}
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition ${
+                      disabled
+                        ? 'bg-gray-50 cursor-not-allowed opacity-60'
+                        : 'hover:bg-blue-50 border border-transparent hover:border-blue-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                        <Target className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 truncate">{group.name}</span>
+                    </div>
+                    <span className="flex-shrink-0 text-xs font-medium">
+                      {invitingGroupId === group.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                      ) : isMember ? (
+                        <span className="text-gray-400">Member</span>
+                      ) : isPending ? (
+                        <span className="flex items-center gap-1 text-amber-600"><Clock className="h-3 w-3" /> Pending</span>
+                      ) : (
+                        <span className="text-blue-600">Invite</span>
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition-all ${toastMessage.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          }`}>
+          {toastMessage.text}
+        </div>
+      )}
+    </>
   )
 }

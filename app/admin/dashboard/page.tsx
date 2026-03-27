@@ -9,7 +9,6 @@ export default async function AdminDashboardPage() {
 
   // Check if user is admin
   const { data: { user } } = await supabase.auth.getUser()
-
   if (!user) {
     redirect('/login')
   }
@@ -44,7 +43,7 @@ export default async function AdminDashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
-            Reading Plans Dashboard
+
           </h1>
           <p className="text-sm sm:text-base text-gray-600">
             Monitor subscriber engagement and reading progress

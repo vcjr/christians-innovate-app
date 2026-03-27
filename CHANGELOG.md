@@ -12,7 +12,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-*No unreleased changes yet.*
+### Victor Crispin — [@vcjr](https://github.com/vcjr)
+
+**Multi-Group Accountability Membership** — CI-6
+
+Users can now belong to multiple accountability groups simultaneously. The single `accountability_group_id` foreign key on `user_profiles` has been replaced with a `user_group_memberships` junction table, unlocking true many-to-many group membership.
+
+- Migration `20260326000000`: creates `user_group_memberships`, migrates existing data, drops old column, adds `NOT NULL` on `group_commitments.status`, hardens `SECURITY DEFINER` functions with `SET search_path`, splits overly-broad `FOR ALL` RLS policies into granular SELECT/INSERT/UPDATE/DELETE, fixes `accept_group_invitation` with row-count verification
+- All server actions, RLS policies, dashboard queries, and directory queries updated to use the junction table
+- Group switcher always visible on `/accountability` — one tab per group, `+ New Group`, and `Discover Groups` links
+
+**Group Discovery & Join Requests** — CI-6
+
+New `/accountability/discover` page lets any authenticated member browse all groups, see member counts and avatar previews, and request to join. Group creators review and act on pending requests inline above their hub.
+
+- Migration `20260327000000`: `group_join_requests` table with RLS + `approve_join_request()` SECURITY DEFINER function (needed because normal RLS restricts `user_group_memberships` inserts to self)
+- Migration `20260327000001`: opens `user_group_memberships` SELECT to all authenticated users so the discover page can display member counts for groups the viewer hasn't joined
+- New server actions: `requestToJoinGroup`, `approveJoinRequest`, `rejectJoinRequest`, `cancelJoinRequest`
+- New components: `JoinRequestButton` (3 states: request / pending+cancel / request again) and `PendingJoinRequests` (creator approve/decline panel)
+- Discover Groups card added to the onboarding empty state
+
+**Comprehensive Notification System with Realtime** — CI-6
+
+The notification bell now updates live without a page reload, and every meaningful accountability event triggers a notification.
+
+- Migration `20260327000002`: adds `notifications` table to the Supabase Realtime publication
+- `NotificationBell` subscribes to `INSERT` events filtered to the current user via Supabase channel — badge increments instantly when a new notification arrives
+- New notification types added across all accountability actions:
+
+| Type | Trigger | Recipient |
+|---|---|---|
+| `invitation_accepted` | Invitee accepts | Inviter |
+| `invitation_declined` | Invitee declines | Inviter |
+| `join_request` | User requests to join | Group creator |
+| `join_request_approved` | Creator approves | Requester |
+| `join_request_rejected` | Creator rejects | Requester |
+| `member_removed` | Creator removes member | Removed member |
+| `member_left` | Member leaves | Group creator |
+| `ownership_transferred` | Ownership transferred | New owner |
+| `rhythm_updated` | Meeting schedule changed | All other members |
+
+**Bi-Weekly Rhythm: Two Days with Independent Times** — CI-6
+
+When bi-weekly frequency is selected, a second day picker and its own time input appear. Both calendar exports are updated to reflect per-day schedules.
+
+- Second day selector (filtered to exclude day 1); time picker disabled until a day is chosen
+- Google Calendar: opens two separate recurring-event tabs, one per day
+- ICS export: single `.ics` file with two `VEVENT` blocks so both events import together
+- Dashboard widget shows `Mondays @ 9:00 AM · Thursdays @ 6:00 PM` format
+- `rhythm_updated` notification includes both days in the message
+
+**Admin Dashboard Restored** — CI-6
+
+The analytics dashboard (`/admin/dashboard`) was missing from the working branch after a prior "archive" commit. Restored `actions.ts`, `page.tsx`, `stats-cards.tsx`, and the Dashboard nav link in the admin layout.
+
+**Navigation Refactor** — CI-6
+
+Moved Admin link and Sign Out out of the main nav bar and into `UserProfileDropdown` to free nav real estate as features grow. Sign Out now shows a loading state while `clearLocalSessionData` runs before session invalidation.
+
+**Bug Fixes** — CI-6
+
+- Removed stale `user_profiles.accountability_group_id` references from `/dashboard` and `/accountability/create` after the column was dropped
+- Fixed group picker modal expanding the page width by rendering it outside the main container via a React fragment
+- Normalized `/accountability` page padding to match the nav's `max-w-7xl px-4 sm:px-6 lg:px-8` width
+- Updated create-group guidelines to reflect that multiple groups are now permitted
+
+---
+
+### Summary
+
+| Category | Details |
+|---|---|
+| **New features** | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm |
+| **Bug fixes** | Stale column references, modal layout overflow, page width misalignment |
+| **Security** | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy |
+| **Navigation** | Admin + Sign Out moved to profile dropdown |
+| **Migrations** | 4 new migration files |
+| **Files changed** | 25 files · +2 393 lines added · −483 lines removed |
 
 ---
 
