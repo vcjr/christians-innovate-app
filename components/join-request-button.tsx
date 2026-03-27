@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { UserPlus, Clock, X, Loader2 } from 'lucide-react'
 import { requestToJoinGroup, cancelJoinRequest } from '@/app/accountability/actions'
@@ -16,6 +16,10 @@ export function JoinRequestButton({ groupId, existingRequest }: JoinRequestButto
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    setRequest(existingRequest)
+  }, [existingRequest])
+
   const handleRequest = async () => {
     setIsLoading(true)
     setError(null)
@@ -23,6 +27,7 @@ export function JoinRequestButton({ groupId, existingRequest }: JoinRequestButto
     if (result.error) {
       setError(result.error)
     } else {
+      setRequest({ id: result.requestId!, status: 'pending' })
       router.refresh()
     }
     setIsLoading(false)

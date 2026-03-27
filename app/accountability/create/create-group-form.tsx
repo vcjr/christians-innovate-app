@@ -12,9 +12,17 @@ export function CreateGroupForm() {
     setIsSubmitting(true)
     
     try {
-      await createGroup(formData)
+      const result = await createGroup(formData)
+
+      // Handle validation/auth errors returned as an object instead of thrown
+      if (result && typeof result === 'object' && 'error' in result && result.error) {
+        setError(result.error as string)
+      }
+
+      // If there was no redirect/throw, ensure submitting state is reset
+      setIsSubmitting(false)
     } catch (err: any) {
-      setError(err.message || 'Failed to create group')
+      setError(err?.message || 'Failed to create group')
       setIsSubmitting(false)
     }
   }
