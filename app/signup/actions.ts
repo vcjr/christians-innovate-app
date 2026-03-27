@@ -1,8 +1,10 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { sendEmail } from '@/utils/email/sender'
+import { renderEmailTemplate } from '@/utils/email/templates'
+import { generateUnsubscribeUrl } from '@/utils/email/tokens'
 
 export async function signup(formData: FormData) {
   console.log('=== SIGNUP PROCESS STARTED ===')
@@ -64,6 +66,60 @@ export async function signup(formData: FormData) {
 
     console.log('User signup successful, user ID:', authData.user?.id)
     console.log('Profile auto-created by database trigger')
+
+    // Send welcome email
+    if (authData.user) {
+      try {
+        console.log('Attempting to send welcome email to:', email)
+
+        // Fetch the welcome template
+        const { data: template, error: templateError } = await supabase
+          .from('email_templates')
+          .select('*')
+          .eq('template_key', 'welcome')
+          .eq('is_active', true)
+          .single()
+
+        if (template && !templateError) {
+          const unsubscribeLink = generateUnsubscribeUrl(authData.user.id, email)
+          const variables = {
+            user: {
+              name,
+              email,
+              id: authData.user.id,
+            },
+            unsubscribe_link: unsubscribeLink,
+            site_url: process.env.NEXT_PUBLIC_SITE_URL || 'https://christiansinnovate.com',
+          }
+
+          const rendered = renderEmailTemplate(
+            template.subject,
+            template.body_html,
+            template.body_text,
+            variables
+          )
+
+          await sendEmail({
+            to: email,
+            subject: rendered.subject,
+            html: rendered.html,
+            text: rendered.text,
+            templateKey: 'welcome',
+            userId: authData.user.id,
+            metadata: {
+              type: 'welcome',
+            },
+          })
+
+          console.log('Welcome email sent successfully')
+        } else {
+          console.log('Welcome template not found or inactive, skipping email')
+        }
+      } catch (emailError) {
+        // Don't fail signup if email fails
+        console.error('Failed to send welcome email:', emailError)
+      }
+    }
 
     // Check if email confirmation is required
     if (authData.user && authData.user.confirmed_at) {
