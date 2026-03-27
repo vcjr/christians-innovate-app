@@ -30,13 +30,13 @@ export async function login(formData: FormData) {
       // Create profile for user if it doesn't exist
       await supabase
         .from('user_profiles')
-        .insert({
+        .upsert({
           user_id: authData.user.id,
           full_name: authData.user.user_metadata?.full_name || authData.user.email?.split('@')[0] || 'User',
           ci_updates: false,
           bible_year: false,
           skill_share: false
-        })
+        }, { onConflict: 'user_id', ignoreDuplicates: true })
     }
   }
 

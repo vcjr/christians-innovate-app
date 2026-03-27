@@ -253,14 +253,18 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
 
     setChangingEmail(true)
     try {
-      const { error } = await supabase.auth.updateUser({ email: newEmail })
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://app.christiansinnovate.com'
+      const { error } = await supabase.auth.updateUser(
+        { email: newEmail },
+        { emailRedirectTo: `${siteUrl}/auth/confirm?type=email_change` }
+      )
       if (error) {
         setEmailMessage({ type: 'error', text: error.message })
         return
       }
       setEmailMessage({
         type: 'success',
-        text: `Confirmation sent to ${newEmail}. Click the link in that email to complete the change.`,
+        text: `Confirmation links sent to both ${user.email} and ${newEmail}. Click the link in each email to complete the change.`,
       })
       setNewEmail('')
     } catch {
