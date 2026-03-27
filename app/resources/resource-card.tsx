@@ -95,9 +95,8 @@ export function ResourceCard({ resource, currentUserId, isAdmin }: ResourceCardP
 
   return (
     <div
-      className={`bg-white border rounded-lg p-6 shadow-sm hover:shadow-md transition ${
-        resource.is_hidden ? 'opacity-60 border-orange-300' : 'border-gray-200'
-      }`}
+      className={`bg-white border rounded-lg p-6 shadow-sm hover:shadow-md transition flex flex-col ${resource.is_hidden ? 'opacity-60 border-orange-300' : 'border-gray-200'
+        }`}
     >
       {/* Header */}
       <div className="flex items-start gap-4 mb-4">
@@ -113,7 +112,7 @@ export function ResourceCard({ resource, currentUserId, isAdmin }: ResourceCardP
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 truncate">{resource.title}</h3>
+              <h3 className="font-semibold text-gray-900 line-clamp-2" title={resource.title}>{resource.title}</h3>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${categoryStyle.bg} ${categoryStyle.text}`}>
                   {resource.category}
@@ -162,7 +161,7 @@ export function ResourceCard({ resource, currentUserId, isAdmin }: ResourceCardP
       </div>
 
       {/* Actions */}
-      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+      <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
         {/* View/Download Button */}
         <a
           href={getResourceUrl()}
@@ -191,11 +190,10 @@ export function ResourceCard({ resource, currentUserId, isAdmin }: ResourceCardP
                 <button
                   onClick={handleToggleActive}
                   disabled={isLoading && actionType === 'toggle'}
-                  className={`p-2 rounded-lg text-sm font-medium ${
-                    resource.is_active
+                  className={`p-2 rounded-lg text-sm font-medium ${resource.is_active
                       ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
                       : 'bg-green-100 text-green-700 hover:bg-green-200'
-                  } disabled:opacity-50`}
+                    } disabled:opacity-50`}
                   title={resource.is_active ? 'Deactivate' : 'Activate'}
                 >
                   {isLoading && actionType === 'toggle' ? (

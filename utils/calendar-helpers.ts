@@ -3,54 +3,52 @@
 interface RhythmConfig {
   frequency: 'weekly' | 'biweekly';
   day: string;
+  day2?: string;  // second meeting day for bi-weekly (twice per week)
   time: string;
+  time2?: string; // separate time for the second day
 }
 
 /**
  * Generates a Google Calendar URL for adding a recurring meeting
  */
+// Returns one URL for weekly/single-day, or two URLs for bi-weekly (twice per week).
+export function generateGoogleCalendarUrls(
+  groupName: string,
+  rhythmConfig: RhythmConfig,
+  attendeeEmails: string[] = []
+): string[] {
+  const { day, day2, time, time2 } = rhythmConfig;
+
+  const makeUrl = (meetingDay: string, meetingTime: string) => {
+    const [hours, minutes] = meetingTime.split(':');
+    const nextDate = getNextOccurrence(meetingDay);
+    nextDate.setHours(parseInt(hours), parseInt(minutes || '0'), 0, 0);
+    const startDateTime = formatDateForGoogle(nextDate);
+    const endDate = new Date(nextDate.getTime() + 60 * 60 * 1000);
+    const endDateTime = formatDateForGoogle(endDate);
+    const recurrence = `RRULE:FREQ=WEEKLY;INTERVAL=1;BYDAY=${getDayAbbreviation(meetingDay)}`;
+
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: `${groupName} - Accountability Meeting`,
+      dates: `${startDateTime}/${endDateTime}`,
+      details: 'Regular accountability group meeting to review commitments and support each other.',
+      recur: recurrence,
+    });
+    if (attendeeEmails.length > 0) params.set('add', attendeeEmails.join(','));
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  };
+
+  return day2 ? [makeUrl(day, time), makeUrl(day2, time2 || time)] : [makeUrl(day, time)];
+}
+
+/** @deprecated use generateGoogleCalendarUrls */
 export function generateGoogleCalendarUrl(
   groupName: string,
   rhythmConfig: RhythmConfig,
   attendeeEmails: string[] = []
 ): string {
-  const { frequency, day, time } = rhythmConfig;
-  
-  // Parse time (format: "HH:00")
-  const [hours, minutes] = time.split(':');
-  
-  // Get next occurrence of the specified day
-  const nextDate = getNextOccurrence(day);
-  
-  // Set the time
-  nextDate.setHours(parseInt(hours), parseInt(minutes || '0'), 0, 0);
-  
-  // Format dates for Google Calendar (YYYYMMDDTHHMMSS)
-  const startDateTime = formatDateForGoogle(nextDate);
-  
-  // End time (1 hour later)
-  const endDate = new Date(nextDate.getTime() + 60 * 60 * 1000);
-  const endDateTime = formatDateForGoogle(endDate);
-  
-  // Build recurrence rule (RRULE)
-  const interval = frequency === 'weekly' ? 1 : 2;
-  const dayOfWeek = getDayAbbreviation(day);
-  const recurrence = `RRULE:FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${dayOfWeek}`;
-  
-  const params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: `${groupName} - Accountability Meeting`,
-    dates: `${startDateTime}/${endDateTime}`,
-    details: 'Regular accountability group meeting to review commitments and support each other.',
-    recur: recurrence,
-  });
-
-  // Add group members as attendees
-  if (attendeeEmails.length > 0) {
-    params.set('add', attendeeEmails.join(','));
-  }
-  
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  return generateGoogleCalendarUrls(groupName, rhythmConfig, attendeeEmails)[0];
 }
 
 /**
@@ -61,53 +59,50 @@ export function generateICSFile(
   rhythmConfig: RhythmConfig,
   attendees: { name: string; email: string }[] = []
 ): string {
-  const { frequency, day, time } = rhythmConfig;
-  
-  // Parse time
-  const [hours, minutes] = time.split(':');
-  
-  // Get next occurrence
-  const nextDate = getNextOccurrence(day);
-  nextDate.setHours(parseInt(hours), parseInt(minutes || '0'), 0, 0);
-  
-  // Format dates for ICS (YYYYMMDDTHHMMSS)
-  const startDateTime = formatDateForICS(nextDate);
-  
-  // End time (1 hour later)
-  const endDate = new Date(nextDate.getTime() + 60 * 60 * 1000);
-  const endDateTime = formatDateForICS(endDate);
-  
-  // Build recurrence rule
-  const interval = frequency === 'weekly' ? 1 : 2;
-  const dayOfWeek = getDayAbbreviation(day);
-  const rrule = `FREQ=WEEKLY;INTERVAL=${interval};BYDAY=${dayOfWeek}`;
-  
-  // Generate unique ID
-  const uid = `accountability-${groupName.replace(/\s+/g, '-')}-${Date.now()}@christians-innovate.app`;
-  
-  // ICS file content
-  const ics = [
+  const { day, day2, time, time2 } = rhythmConfig;
+
+  const now = formatDateForICS(new Date());
+  const attendeeLines = attendees.map(a => `ATTENDEE;CN=${a.name};RSVP=TRUE:mailto:${a.email}`);
+
+  const makeVEvent = (meetingDay: string, meetingTime: string, index: number) => {
+    const [hours, minutes] = meetingTime.split(':');
+    const nextDate = getNextOccurrence(meetingDay);
+    nextDate.setHours(parseInt(hours), parseInt(minutes || '0'), 0, 0);
+    const startDateTime = formatDateForICS(nextDate);
+    const endDate = new Date(nextDate.getTime() + 60 * 60 * 1000);
+    const endDateTime = formatDateForICS(endDate);
+    const rrule = `FREQ=WEEKLY;INTERVAL=1;BYDAY=${getDayAbbreviation(meetingDay)}`;
+    const uid = `accountability-${groupName.replace(/\s+/g, '-')}-${meetingDay.toLowerCase()}-${index}@christians-innovate.app`;
+
+    return [
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `DTSTAMP:${now}`,
+      `DTSTART:${startDateTime}`,
+      `DTEND:${endDateTime}`,
+      `RRULE:${rrule}`,
+      `SUMMARY:${groupName} - Accountability Meeting (${meetingDay})`,
+      'DESCRIPTION:Regular accountability group meeting to review commitments and support each other.',
+      ...attendeeLines,
+      'STATUS:CONFIRMED',
+      'SEQUENCE:0',
+      'END:VEVENT',
+    ].join('\r\n');
+  };
+
+  const vevents = day2
+    ? [makeVEvent(day, time, 1), makeVEvent(day2, time2 || time, 2)]
+    : [makeVEvent(day, time, 1)];
+
+  return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//Christians Innovate//Accountability Hub//EN',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    `UID:${uid}`,
-    `DTSTAMP:${formatDateForICS(new Date())}`,
-    `DTSTART:${startDateTime}`,
-    `DTEND:${endDateTime}`,
-    `RRULE:${rrule}`,
-    `SUMMARY:${groupName} - Accountability Meeting`,
-    'DESCRIPTION:Regular accountability group meeting to review commitments and support each other.',
-    ...attendees.map(a => `ATTENDEE;CN=${a.name};RSVP=TRUE:mailto:${a.email}`),
-    'STATUS:CONFIRMED',
-    'SEQUENCE:0',
-    'END:VEVENT',
+    ...vevents,
     'END:VCALENDAR',
   ].join('\r\n');
-  
-  return ics;
 }
 
 /**
@@ -133,10 +128,17 @@ function getNextOccurrence(dayName: string): Date {
   const today = new Date();
   const currentDay = today.getDay();
   
+  if (targetDay === -1) {
+    // Unknown day name — fall back to next Monday rather than silently producing a wrong date
+    return getNextOccurrence('Monday');
+  }
+
   let daysUntilTarget = targetDay - currentDay;
-  if (daysUntilTarget <= 0) {
+  if (daysUntilTarget < 0) {
     daysUntilTarget += 7;
   }
+  // daysUntilTarget === 0 means today is the target day; leave it as 0 so we
+  // return today's date and let the caller decide whether the time has passed.
   
   const nextDate = new Date(today);
   nextDate.setDate(today.getDate() + daysUntilTarget);
@@ -156,7 +158,14 @@ function formatDateForGoogle(date: Date): string {
 }
 
 function formatDateForICS(date: Date): string {
-  return formatDateForGoogle(date) + 'Z';
+  // Use UTC getters so the trailing 'Z' (UTC designator) is correct
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
 }
 
 function getDayAbbreviation(dayName: string): string {

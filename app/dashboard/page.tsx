@@ -37,7 +37,7 @@ export default async function Dashboard({
 
   const { data: userProfile, error: userProfileError } = await supabase
     .from('user_profiles')
-    .select('bible_year, accountability_group_id')
+    .select('bible_year')
     .eq('user_id', user.id)
     .single()
   if (userProfileError) {
@@ -46,30 +46,35 @@ export default async function Dashboard({
 
   const subscribedPlanIds = subscriptions?.map(s => s.plan_id) || []
 
-  // Get user's accountability group status
-
+  // Get user's accountability group status (use first group for the dashboard widget)
   let accountabilityStats = null
-  if (userProfile?.accountability_group_id) {
-    // Fetch group data
+  const { data: firstMembership } = await supabase
+    .from('user_group_memberships')
+    .select('group_id')
+    .eq('user_id', user.id)
+    .limit(1)
+    .single()
+
+  if (firstMembership?.group_id) {
+    const groupId = firstMembership.group_id
+
     const { data: group } = await supabase
       .from('accountability_groups')
       .select('name')
-      .eq('id', userProfile.accountability_group_id)
+      .eq('id', groupId)
       .single()
 
-    // Count active commitments for the user
     const { count: activeCommitments } = await supabase
       .from('group_commitments')
       .select('*', { count: 'exact', head: true })
-      .eq('group_id', userProfile.accountability_group_id)
+      .eq('group_id', groupId)
       .eq('user_id', user.id)
       .eq('status', 'active')
 
-    // Count group members
     const { count: memberCount } = await supabase
-      .from('user_profiles')
+      .from('user_group_memberships')
       .select('*', { count: 'exact', head: true })
-      .eq('accountability_group_id', userProfile.accountability_group_id)
+      .eq('group_id', groupId)
 
     accountabilityStats = {
       groupName: group?.name,

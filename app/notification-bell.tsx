@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Bell, X } from 'lucide-react'
 import { markNotificationRead, dismissNotification, clearAllNotifications } from '@/app/accountability/actions'
+import { createClient } from '@/utils/supabase/client'
 
 interface Notification {
   id: string
@@ -18,25 +19,44 @@ interface Notification {
 interface NotificationBellProps {
   notifications: Notification[]
   unreadCount: number
+  userId: string
 }
 
-export function NotificationBell({ notifications }: NotificationBellProps) {
+export function NotificationBell({ notifications, unreadCount, userId }: NotificationBellProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [readIds, setReadIds] = useState<Set<string>>(new Set())
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set())
-  const [cleared, setCleared] = useState(false)
+  const [liveNotifications, setLiveNotifications] = useState<Notification[]>(notifications)
+  const [liveUnreadCount, setLiveUnreadCount] = useState(unreadCount)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  const visibleNotifications = cleared
-    ? []
-    : notifications
-        .filter(n => !dismissedIds.has(n.id))
-        .map(n => readIds.has(n.id) ? { ...n, is_read: true } : n)
+  const visibleNotifications = liveNotifications
+    .filter(n => !dismissedIds.has(n.id))
+    .map(n => readIds.has(n.id) ? { ...n, is_read: true } : n)
 
-  const displayUnreadCount = cleared
-    ? 0
-    : visibleNotifications.filter(n => !n.is_read).length
+  // Use the live unread count for the badge, adjusted for local reads/dismisses.
+  const locallyReadCount = [...readIds].filter(id => liveNotifications.some(n => n.id === id && !n.is_read)).length
+  const displayUnreadCount = Math.max(0, liveUnreadCount - locallyReadCount - dismissedIds.size)
+
+  // Realtime subscription — prepend new notifications as they arrive
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('notifications-live')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const incoming = payload.new as Notification
+          setLiveNotifications(prev => [incoming, ...prev])
+          setLiveUnreadCount(prev => prev + 1)
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [userId])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -68,12 +88,15 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
   }
 
   const handleClearAll = async () => {
-    setCleared(true)
     await clearAllNotifications()
     router.refresh()
   }
 
-  const [now] = useState(() => Date.now())
+  // Refresh the base timestamp each time the dropdown opens so labels are accurate
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (isOpen) setNow(Date.now())
+  }, [isOpen])
 
   const timeAgo = (dateStr: string) => {
     const diff = now - new Date(dateStr).getTime()
@@ -95,7 +118,7 @@ export function NotificationBell({ notifications }: NotificationBellProps) {
       >
         <Bell className="h-5 w-5" />
         {displayUnreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center w-4.5 h-4.5 text-[10px] font-bold text-white bg-red-500 rounded-full min-w-[18px] px-1">
+          <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center w-[18px] h-[18px] text-[10px] font-bold text-white bg-red-500 rounded-full min-w-[18px] px-1">
             {displayUnreadCount > 9 ? '9+' : displayUnreadCount}
           </span>
         )}

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe, UserPlus, Clock, Loader2 } from 'lucide-react'
+import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe, UserPlus, Clock, Loader2, X, Target } from 'lucide-react'
 import { sendGroupInvitation } from '@/app/accountability/actions'
 
 interface UserProfile {
@@ -16,19 +16,23 @@ interface UserProfile {
   interests: string[]
   looking_for_business_partner: boolean
   looking_for_accountability_partner: boolean
-  accountability_group_id: string | null
   linkedin_url: string | null
   facebook_url: string | null
   twitter_url: string | null
   website_url: string | null
 }
 
+interface OwnedGroup {
+  id: string
+  name: string
+}
+
 interface DirectoryClientProps {
   profiles: UserProfile[]
   currentUserId: string
-  userGroupId: string | null
-  isGroupCreator: boolean
-  pendingInvitedUserIds: string[]
+  ownedGroups: OwnedGroup[]
+  membershipByGroup: Record<string, string[]>
+  pendingByGroup: Record<string, string[]>
 }
 
 function getInitials(name: string | null): string {
@@ -40,29 +44,41 @@ function getInitials(name: string | null): string {
   return name.substring(0, 2).toUpperCase()
 }
 
-export function DirectoryClient({ profiles, currentUserId, isGroupCreator, pendingInvitedUserIds }: DirectoryClientProps) {
+export function DirectoryClient({ profiles, currentUserId, ownedGroups, membershipByGroup, pendingByGroup }: DirectoryClientProps) {
   const router = useRouter()
   const [expandedSkills, setExpandedSkills] = useState<Set<string>>(new Set())
   const [expandedInterests, setExpandedInterests] = useState<Set<string>>(new Set())
-  const [invitingUserId, setInvitingUserId] = useState<string | null>(null)
-  const [invitedUserIds, setInvitedUserIds] = useState<Set<string>>(new Set(pendingInvitedUserIds))
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
-  const handleInvite = async (userId: string, userName: string) => {
-    setInvitingUserId(userId)
+  // Modal state
+  const [modalTarget, setModalTarget] = useState<{ userId: string; userName: string } | null>(null)
+  const [invitingGroupId, setInvitingGroupId] = useState<string | null>(null)
+  // Track locally sent invites: groupId -> Set of userIds
+  const [sentInvites, setSentInvites] = useState<Record<string, Set<string>>>({})
+
+  const openModal = (userId: string, userName: string) => setModalTarget({ userId, userName })
+  const closeModal = () => { setModalTarget(null); setInvitingGroupId(null) }
+
+  const handleInvite = async (groupId: string) => {
+    if (!modalTarget) return
+    setInvitingGroupId(groupId)
     try {
-      const result = await sendGroupInvitation(userId)
+      const result = await sendGroupInvitation(modalTarget.userId, groupId)
       if (result.error) {
         setToastMessage({ text: result.error, type: 'error' })
       } else {
-        setInvitedUserIds(prev => new Set(prev).add(userId))
-        setToastMessage({ text: `Invitation sent to ${userName || 'member'}!`, type: 'success' })
+        setSentInvites(prev => ({
+          ...prev,
+          [groupId]: new Set([...(prev[groupId] || []), modalTarget.userId]),
+        }))
+        setToastMessage({ text: `Invitation sent to ${modalTarget.userName || 'member'}!`, type: 'success' })
+        closeModal()
         router.refresh()
       }
     } catch {
       setToastMessage({ text: 'Failed to send invitation', type: 'error' })
     } finally {
-      setInvitingUserId(null)
+      setInvitingGroupId(null)
       setTimeout(() => setToastMessage(null), 3000)
     }
   }
@@ -92,6 +108,7 @@ export function DirectoryClient({ profiles, currentUserId, isGroupCreator, pendi
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
@@ -293,33 +310,14 @@ export function DirectoryClient({ profiles, currentUserId, isGroupCreator, pendi
                 })()}
 
                 {/* Invite to Group Button */}
-                {isGroupCreator && profile.user_id !== currentUserId && !profile.accountability_group_id && (
+                {ownedGroups.length > 0 && profile.user_id !== currentUserId && (
                   <div className="pt-3 border-t border-gray-100 mt-3">
-                    {invitedUserIds.has(profile.user_id) ? (
-                      <div className="flex items-center gap-2 text-amber-600 text-sm font-medium">
-                        <Clock className="h-4 w-4" />
-                        Invitation pending
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleInvite(profile.user_id, profile.full_name || 'Member')}
-                        disabled={invitingUserId === profile.user_id}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {invitingUserId === profile.user_id ? (
-                          <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</>
-                        ) : (
-                          <><UserPlus className="h-4 w-4" /> Invite to Group</>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Already in a group indicator */}
-                {isGroupCreator && profile.user_id !== currentUserId && profile.accountability_group_id && (
-                  <div className="pt-3 border-t border-gray-100 mt-3">
-                    <p className="text-xs text-gray-400 text-center">Already in a group</p>
+                    <button
+                      onClick={() => openModal(profile.user_id, profile.full_name || 'Member')}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                    >
+                      <UserPlus className="h-4 w-4" /> Invite to Group
+                    </button>
                   </div>
                 )}
               </div>
@@ -336,6 +334,63 @@ export function DirectoryClient({ profiles, currentUserId, isGroupCreator, pendi
           </div>
         )}
       </div>
+    </div>
+
+      {/* Group picker modal */}
+      {modalTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={closeModal}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Invite to Group</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Select a group for {modalTarget.userName}</p>
+              </div>
+              <button onClick={closeModal} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-3 space-y-2 max-h-72 overflow-y-auto">
+              {ownedGroups.map(group => {
+                const isMember = (membershipByGroup[group.id] || []).includes(modalTarget.userId)
+                const isPending = (pendingByGroup[group.id] || []).includes(modalTarget.userId) || sentInvites[group.id]?.has(modalTarget.userId)
+                const disabled = isMember || isPending || invitingGroupId === group.id
+
+                return (
+                  <button
+                    key={group.id}
+                    onClick={() => !disabled && handleInvite(group.id)}
+                    disabled={disabled}
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition ${
+                      disabled
+                        ? 'bg-gray-50 cursor-not-allowed opacity-60'
+                        : 'hover:bg-blue-50 border border-transparent hover:border-blue-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                        <Target className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 truncate">{group.name}</span>
+                    </div>
+                    <span className="flex-shrink-0 text-xs font-medium">
+                      {invitingGroupId === group.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                      ) : isMember ? (
+                        <span className="text-gray-400">Member</span>
+                      ) : isPending ? (
+                        <span className="flex items-center gap-1 text-amber-600"><Clock className="h-3 w-3" /> Pending</span>
+                      ) : (
+                        <span className="text-blue-600">Invite</span>
+                      )}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast notification */}
       {toastMessage && (
@@ -344,6 +399,6 @@ export function DirectoryClient({ profiles, currentUserId, isGroupCreator, pendi
           {toastMessage.text}
         </div>
       )}
-    </div>
+    </>
   )
 }

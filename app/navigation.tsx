@@ -1,11 +1,9 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import Image from 'next/image'
-import { LayoutDashboard, Shield, LogOut, Users, Rocket, FolderOpen, Target } from 'lucide-react'
-import { signOut } from './actions'
+import { LayoutDashboard, Users, Rocket, FolderOpen, Target } from 'lucide-react'
 import { MobileMenu } from './mobile-menu'
 import { UserProfileDropdown } from './user-profile-dropdown'
-import { SignOutButton } from '@/components/auth/SignOutButton'
 import { NotificationBell } from './notification-bell'
 
 export async function NavigationBar() {
@@ -13,7 +11,7 @@ export async function NavigationBar() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return null // No nav for unauthenticated users
+    return null
   }
 
   // Check if user is admin from database
@@ -104,31 +102,22 @@ export async function NavigationBar() {
                 <Target className="h-4 w-4" />
                 Accountability
               </Link>
-
-              {isAdmin && (
-                <Link
-                  href="/admin/dashboard"
-                  className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium transition"
-                >
-                  <Shield className="h-4 w-4" />
-                  Admin
-                </Link>
-              )}
             </div>
           </div>
 
-          {/* Desktop User Info */}
+          {/* Desktop User Controls */}
           <div className="hidden md:flex items-center gap-3">
             <NotificationBell
               notifications={notifications || []}
               unreadCount={unreadCount || 0}
+              userId={user.id}
             />
             <UserProfileDropdown
               fullName={userProfile?.full_name || null}
               avatarUrl={userProfile?.avatar_url || null}
               userId={user.id}
+              isAdmin={isAdmin}
             />
-            <SignOutButton />
           </div>
 
           {/* Mobile Menu */}

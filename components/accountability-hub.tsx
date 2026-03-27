@@ -23,7 +23,7 @@ import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
 import { createCommitment, updateCommitmentStatus, leaveGroup, updateRhythmConfig, saveReflection, updateCommitment, updateGroup, removeMember, transferOwnership } from '@/app/accountability/actions';
 import { showToast, ToastContainer } from '@/components/toast';
-import { generateGoogleCalendarUrl, generateICSFile, downloadICSFile } from '@/utils/calendar-helpers';
+import { generateGoogleCalendarUrls, generateICSFile, downloadICSFile } from '@/utils/calendar-helpers';
 
 // --- TypeScript Interfaces ---
 interface GroupMember {
@@ -55,7 +55,9 @@ interface Group {
   rhythm_config?: {
     frequency: string;
     day: string;
+    day2?: string;
     time: string;
+    time2?: string;
   } | null;
 }
 
@@ -186,7 +188,9 @@ export default function AccountabilityHub({ group, members, commitments: initial
   // Rhythm configuration state
   const [rhythmFrequency, setRhythmFrequency] = useState(group.rhythm_config?.frequency || 'weekly');
   const [rhythmDay, setRhythmDay] = useState(group.rhythm_config?.day || 'Monday');
+  const [rhythmDay2, setRhythmDay2] = useState(group.rhythm_config?.day2 || '');
   const [rhythmTime, setRhythmTime] = useState(group.rhythm_config?.time || '09:00');
+  const [rhythmTime2, setRhythmTime2] = useState(group.rhythm_config?.time2 || '09:00');
 
   // Debrief reflection state
   const [reflectionNotes, setReflectionNotes] = useState('');
@@ -269,6 +273,7 @@ export default function AccountabilityHub({ group, members, commitments: initial
     setIsSubmitting(true);
     const formData = new FormData();
     formData.append('commitment_text', newCommitment);
+    formData.append('group_id', group.id);
     if (newCommitmentDueDate) {
       formData.append('due_date', newCommitmentDueDate);
     }
@@ -322,8 +327,16 @@ export default function AccountabilityHub({ group, members, commitments: initial
     formData.append('commitment_id', commitmentId);
     formData.append('status', newStatus);
 
-    await updateCommitmentStatus(formData);
-    router.refresh();
+    try {
+      const result = await updateCommitmentStatus(formData);
+      if (result?.error) {
+        showToast(result.error, 'error');
+        return;
+      }
+      router.refresh();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to update commitment status', 'error');
+    }
   };
 
   const saveRhythm = async (e: React.FormEvent) => {
@@ -333,11 +346,17 @@ export default function AccountabilityHub({ group, members, commitments: initial
     const formData = new FormData();
     formData.append('frequency', rhythmFrequency);
     formData.append('day', rhythmDay);
+    if (rhythmFrequency === 'biweekly' && rhythmDay2) {
+      formData.append('day2', rhythmDay2);
+      formData.append('time2', rhythmTime2);
+    }
     formData.append('time', rhythmTime);
+    formData.append('group_id', group.id);
 
     try {
       await updateRhythmConfig(formData);
       showToast('Rhythm configuration saved successfully!', 'success');
+      router.refresh();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to save rhythm configuration', 'error');
     } finally {
@@ -346,26 +365,28 @@ export default function AccountabilityHub({ group, members, commitments: initial
   };
 
   const handleAddToGoogleCalendar = () => {
-    const attendeeEmails = members
-      .filter(m => m.email)
-      .map(m => m.email as string);
-    const url = generateGoogleCalendarUrl(group.name, {
+    const attendeeEmails = members.filter(m => m.email).map(m => m.email as string);
+    const config = {
       frequency: rhythmFrequency as 'weekly' | 'biweekly',
       day: rhythmDay,
-      time: rhythmTime
-    }, attendeeEmails);
-    window.open(url, '_blank');
+      time: rhythmTime,
+      ...(rhythmFrequency === 'biweekly' && rhythmDay2 ? { day2: rhythmDay2, time2: rhythmTime2 } : {}),
+    };
+    const urls = generateGoogleCalendarUrls(group.name, config, attendeeEmails);
+    urls.forEach(url => window.open(url, '_blank'));
   };
 
   const handleDownloadICS = () => {
     const attendees = members
       .filter(m => m.email)
       .map(m => ({ name: m.full_name || 'Member', email: m.email as string }));
-    const icsContent = generateICSFile(group.name, {
+    const config = {
       frequency: rhythmFrequency as 'weekly' | 'biweekly',
       day: rhythmDay,
-      time: rhythmTime
-    }, attendees);
+      time: rhythmTime,
+      ...(rhythmFrequency === 'biweekly' && rhythmDay2 ? { day2: rhythmDay2, time2: rhythmTime2 } : {}),
+    };
+    const icsContent = generateICSFile(group.name, config, attendees);
     downloadICSFile(icsContent, `${group.name.replace(/\s+/g, '-')}-accountability-meeting`);
     showToast('Calendar file downloaded!', 'success');
   };
@@ -378,6 +399,7 @@ export default function AccountabilityHub({ group, members, commitments: initial
     const formData = new FormData();
     formData.append('reflection_notes', reflectionNotes);
     formData.append('hard_question_response', currentQuestion);
+    formData.append('group_id', group.id);
 
     try {
       await saveReflection(formData);
@@ -397,10 +419,12 @@ export default function AccountabilityHub({ group, members, commitments: initial
 
     const formData = new FormData();
     formData.append('member_user_id', memberUserId);
+    formData.append('group_id', group.id);
 
     try {
       await removeMember(formData);
       showToast('Member removed successfully', 'success');
+      router.refresh();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to remove member', 'error');
     }
@@ -411,11 +435,13 @@ export default function AccountabilityHub({ group, members, commitments: initial
 
     const formData = new FormData();
     formData.append('new_owner_id', newOwnerId);
+    formData.append('group_id', group.id);
 
     try {
       await transferOwnership(formData);
       showToast('Ownership transferred successfully', 'success');
       setShowMemberModal(false);
+      router.refresh();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to transfer ownership', 'error');
     }
@@ -435,7 +461,7 @@ export default function AccountabilityHub({ group, members, commitments: initial
   return (
     <div className="min-h-screen bg-gray-50">
       <ToastContainer />
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
         {/* 1. THE VISUAL DASHBOARD (TARGET VIEW) */}
         <TargetView
@@ -470,7 +496,7 @@ export default function AccountabilityHub({ group, members, commitments: initial
               Manage Members ({members.length})
             </button>
 
-            <form action={async () => void await leaveGroup()}>
+            <form action={async () => void await leaveGroup(group.id)}>
               <button
                 type="submit"
                 className="text-sm text-red-600 hover:text-red-700 font-medium"
@@ -638,12 +664,17 @@ export default function AccountabilityHub({ group, members, commitments: initial
                     </div>
                     <h4 className="font-bold text-lg capitalize">{group.rhythm_config.frequency}</h4>
                     <p className="text-sm text-gray-500">
-                      {group.rhythm_config.day}s @ {(() => {
-                        const [h, m] = group.rhythm_config!.time.split(':');
-                        const hour = parseInt(h);
-                        const ampm = hour >= 12 ? 'PM' : 'AM';
-                        const displayHour = hour % 12 || 12;
-                        return `${displayHour}:${m || '00'} ${ampm}`;
+                      {(() => {
+                        const fmt = (t: string) => {
+                          const [h, m] = t.split(':');
+                          const hour = parseInt(h);
+                          return `${hour % 12 || 12}:${m || '00'} ${hour >= 12 ? 'PM' : 'AM'}`;
+                        };
+                        const rc = group.rhythm_config!;
+                        if (rc.day2) {
+                          return `${rc.day}s @ ${fmt(rc.time)} · ${rc.day2}s @ ${fmt(rc.time2 || rc.time)}`;
+                        }
+                        return `${rc.day}s @ ${fmt(rc.time)}`;
                       })()}
                     </p>
                     <button
@@ -740,20 +771,21 @@ export default function AccountabilityHub({ group, members, commitments: initial
                   </div>
 
                   <div className="space-y-4">
-                    <label className="text-sm font-bold block">Select Day & Time</label>
+                    <label className="text-sm font-bold block">
+                      {rhythmFrequency === 'biweekly' ? 'Select Days & Time' : 'Select Day & Time'}
+                    </label>
                     <div className="flex gap-2">
                       <select
                         value={rhythmDay}
-                        onChange={(e) => setRhythmDay(e.target.value)}
+                        onChange={(e) => {
+                          setRhythmDay(e.target.value);
+                          if (rhythmDay2 === e.target.value) setRhythmDay2('');
+                        }}
                         className="flex-1 bg-gray-100 p-2 rounded-lg text-sm border-none"
                       >
-                        <option>Monday</option>
-                        <option>Tuesday</option>
-                        <option>Wednesday</option>
-                        <option>Thursday</option>
-                        <option>Friday</option>
-                        <option>Saturday</option>
-                        <option>Sunday</option>
+                        {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => (
+                          <option key={d}>{d}</option>
+                        ))}
                       </select>
                       <input
                         type="time"
@@ -762,6 +794,30 @@ export default function AccountabilityHub({ group, members, commitments: initial
                         className="flex-1 bg-gray-100 p-2 rounded-lg text-sm border-none"
                       />
                     </div>
+                    {rhythmFrequency === 'biweekly' && (
+                      <div>
+                        <label className="text-xs text-gray-500 block mb-1">Second Day</label>
+                        <div className="flex gap-2">
+                          <select
+                            value={rhythmDay2}
+                            onChange={(e) => setRhythmDay2(e.target.value)}
+                            className="flex-1 bg-gray-100 p-2 rounded-lg text-sm border-none"
+                          >
+                            <option value="">— select day —</option>
+                            {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+                              .filter(d => d !== rhythmDay)
+                              .map(d => <option key={d}>{d}</option>)}
+                          </select>
+                          <input
+                            type="time"
+                            value={rhythmTime2}
+                            onChange={(e) => setRhythmTime2(e.target.value)}
+                            disabled={!rhythmDay2}
+                            className="flex-1 bg-gray-100 p-2 rounded-lg text-sm border-none disabled:opacity-40"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -1049,6 +1105,7 @@ export default function AccountabilityHub({ group, members, commitments: initial
                   } else {
                     showToast('Group updated successfully!', 'success');
                     setShowEditTargetModal(false);
+                    router.refresh();
                   }
                   setIsSavingTarget(false);
                 }}

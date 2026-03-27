@@ -61,7 +61,7 @@ export function CreateGroupForm() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="text-sm font-semibold text-gray-900 mb-2">Group Guidelines</h3>
         <ul className="text-sm text-gray-600 space-y-1">
-          <li>• You can only be in one accountability group at a time</li>
+          <li>• You can belong to multiple accountability groups at once</li>
           <li>• As the creator, you can invite members from the directory</li>
           <li>• All members can add commitments and schedule meetings</li>
           <li>• You can leave the group at any time</li>

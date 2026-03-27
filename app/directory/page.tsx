@@ -12,7 +12,6 @@ interface UserProfile {
   interests: string[]
   looking_for_business_partner: boolean
   looking_for_accountability_partner: boolean
-  accountability_group_id: string | null
   linkedin_url: string | null
   facebook_url: string | null
   twitter_url: string | null
@@ -22,57 +21,51 @@ interface UserProfile {
 export default async function DirectoryPage() {
   const supabase = await createClient()
 
-  // Check if user is authenticated
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return redirect('/login')
   }
 
-  // Get current user's profile to check if they're in a group
-  const { data: currentUserProfile } = await supabase
-    .from('user_profiles')
-    .select('accountability_group_id')
-    .eq('user_id', user.id)
-    .single()
+  // Fetch all groups this user is creator of
+  const { data: ownedGroups } = await supabase
+    .from('accountability_groups')
+    .select('id, name')
+    .eq('created_by', user.id)
+    .order('created_at', { ascending: true })
 
-  // Check if user is the group creator
-  let isGroupCreator = false
-  if (currentUserProfile?.accountability_group_id) {
-    const { data: group } = await supabase
-      .from('accountability_groups')
-      .select('created_by')
-      .eq('id', currentUserProfile.accountability_group_id)
-      .single()
-    isGroupCreator = group?.created_by === user.id
+  const ownedGroupIds = (ownedGroups || []).map(g => g.id)
+
+  // Batch-fetch members and pending invites for all owned groups
+  const membershipByGroup: Record<string, string[]> = {}
+  const pendingByGroup: Record<string, string[]> = {}
+
+  if (ownedGroupIds.length > 0) {
+    const [{ data: allMemberships }, { data: allPending }] = await Promise.all([
+      supabase.from('user_group_memberships').select('group_id, user_id').in('group_id', ownedGroupIds),
+      supabase.from('group_invitations').select('group_id, invited_user_id').in('group_id', ownedGroupIds).eq('status', 'pending'),
+    ])
+
+    for (const m of (allMemberships || [])) {
+      membershipByGroup[m.group_id] = [...(membershipByGroup[m.group_id] || []), m.user_id]
+    }
+    for (const p of (allPending || [])) {
+      pendingByGroup[p.group_id] = [...(pendingByGroup[p.group_id] || []), p.invited_user_id]
+    }
   }
 
-  // Fetch pending invitations sent by this user's group
-  let pendingInvitedUserIds: string[] = []
-  if (isGroupCreator && currentUserProfile?.accountability_group_id) {
-    const { data: pendingInvites } = await supabase
-      .from('group_invitations')
-      .select('invited_user_id')
-      .eq('group_id', currentUserProfile.accountability_group_id)
-      .eq('status', 'pending')
-
-    pendingInvitedUserIds = (pendingInvites || []).map(i => i.invited_user_id)
-  }
-
-  // Fetch all user profiles
+  // Fetch all user profiles (accountability_group_id column no longer exists)
   const { data: profiles } = await supabase
     .from('user_profiles')
-    .select('*')
+    .select('id, user_id, full_name, avatar_url, bio, skills, interests, looking_for_business_partner, looking_for_accountability_partner, linkedin_url, facebook_url, twitter_url, website_url')
     .order('full_name', { ascending: true })
-
-  const memberProfiles = (profiles || []) as UserProfile[]
 
   return (
     <DirectoryClient
-      profiles={memberProfiles}
+      profiles={(profiles || []) as UserProfile[]}
       currentUserId={user.id}
-      userGroupId={currentUserProfile?.accountability_group_id || null}
-      isGroupCreator={isGroupCreator}
-      pendingInvitedUserIds={pendingInvitedUserIds}
+      ownedGroups={ownedGroups || []}
+      membershipByGroup={membershipByGroup}
+      pendingByGroup={pendingByGroup}
     />
   )
 }

@@ -27,16 +27,21 @@ export function ToastContainer() {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   useEffect(() => {
+    const timeoutIds: ReturnType<typeof setTimeout>[] = []
+
     const listener = (toast: Toast) => {
       setToasts(prev => [...prev, toast])
-      setTimeout(() => {
+      const id = setTimeout(() => {
         setToasts(prev => prev.filter(t => t.id !== toast.id))
       }, 4000)
+      timeoutIds.push(id)
     }
+
     toastListeners.push(listener)
     return () => {
       const index = toastListeners.indexOf(listener)
       if (index > -1) toastListeners.splice(index, 1)
+      timeoutIds.forEach(id => clearTimeout(id))
     }
   }, [])
 
@@ -56,6 +61,8 @@ export function ToastContainer() {
           {toast.type === 'info' && <Info className="w-5 h-5 text-blue-600" />}
           <span className="text-sm font-medium">{toast.message}</span>
           <button
+            type="button"
+            aria-label="Dismiss"
             onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
             className="ml-2 hover:opacity-70"
           >
