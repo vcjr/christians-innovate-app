@@ -470,6 +470,200 @@ export async function sendBroadcast(formData: FormData) {
   return { error: 'Invalid email configuration' }
 }
 
+export async function sendTestEmail(formData: FormData) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: userRole } = await supabase
+    .from('user_roles')
+    .select('is_admin')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!userRole?.is_admin) return { error: 'Not authorized' }
+
+  const testEmail = (formData.get('test_email') as string)?.trim()
+  if (!testEmail) return { error: 'Test email address is required' }
+
+  const templateId = formData.get('template_id') as string
+  const customSubject = formData.get('custom_subject') as string
+  const customBody = formData.get('custom_body') as string
+  const fromEmail = (formData.get('from_email') as string) || undefined
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://christiansinnovate.com'
+
+  // Use admin's own profile as the sample "user" for variable replacement
+  const { data: adminProfile } = await supabase
+    .from('user_profiles')
+    .select('full_name, email')
+    .eq('user_id', user.id)
+    .single()
+
+  const sampleUser = {
+    name: adminProfile?.full_name || 'Test User',
+    email: testEmail,
+    id: user.id,
+  }
+
+  // Helper: send one recipient via sendBatchEmails (handles template rendering)
+  const sendOne = async (variables: Record<string, unknown>) => {
+    const result = await sendBatchEmails({
+      recipients: [{ email: testEmail, userId: user.id, variables }],
+      templateKey: templateId,
+      subject: customSubject || undefined,
+      from: fromEmail,
+      metadata: { type: 'test' },
+    })
+    if ((result.failed ?? 0) > 0) return { error: 'Failed to send test email' }
+    return { success: true }
+  }
+
+  if (templateId && templateId !== 'custom') {
+    if (templateId === 'daily-reminder') {
+      const serviceSupabase = createServiceClient()
+      const today = new Date().toISOString().split('T')[0]
+      const todayMs = new Date(today).getTime()
+
+      const { data: sub } = await serviceSupabase
+        .from('plan_subscriptions')
+        .select('plan_id, subscribed_at')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single()
+
+      if (!sub) {
+        return { error: 'No plan subscription found for your account — subscribe to a plan first so sample day data can be resolved.' }
+      }
+
+      const dayNumber = Math.max(1, Math.floor((todayMs - new Date(sub.subscribed_at as string).getTime()) / 86_400_000) + 1)
+
+      const { data: planDay } = await serviceSupabase
+        .from('plan_days')
+        .select('id, day_number, scripture_reference')
+        .eq('plan_id', sub.plan_id)
+        .eq('day_number', dayNumber)
+        .single()
+
+      const verseSnippets = planDay
+        ? await fetchVerseSnippetsForEmail([planDay.scripture_reference])
+        : new Map()
+
+      return sendOne({
+        user: sampleUser,
+        day: {
+          number: planDay?.day_number ?? dayNumber,
+          title: planDay?.scripture_reference ?? 'Genesis 1',
+          scripture: (planDay ? verseSnippets.get(planDay.scripture_reference) : null) ?? planDay?.scripture_reference ?? 'In the beginning...',
+          link: planDay ? `${siteUrl}/dashboard/day/${planDay.id}` : siteUrl,
+        },
+        site_url: siteUrl,
+      })
+    }
+
+    if (templateId === 'meeting-reminder') {
+      const serviceSupabase = createServiceClient()
+      const now = new Date().toISOString()
+
+      const { data: upcomingMeeting } = await serviceSupabase
+        .from('meetings')
+        .select('title, description, zoom_link, meeting_date')
+        .gte('meeting_date', now)
+        .order('meeting_date', { ascending: true })
+        .limit(1)
+        .single()
+
+      const getNextThursdayET = (): Date => {
+        const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }))
+        const daysUntilThursday = (4 - etNow.getDay() + 7) % 7 || 7
+        const next = new Date(etNow)
+        next.setDate(etNow.getDate() + daysUntilThursday)
+        next.setHours(12, 0, 0, 0)
+        return next
+      }
+      const etDateFmt = (d: Date) =>
+        d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/New_York' })
+      const etTimeFmt = (d: Date) =>
+        d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: 'America/New_York' })
+
+      let meetingVars: { title: string; date: string; time: string; description: string; zoom_link: string }
+      if (upcomingMeeting) {
+        const md = new Date(upcomingMeeting.meeting_date as string)
+        meetingVars = {
+          title: upcomingMeeting.title as string,
+          date: etDateFmt(md),
+          time: etTimeFmt(md),
+          description: (upcomingMeeting.description as string | null) || 'Join us for our weekly Christians Innovate community meeting.',
+          zoom_link: upcomingMeeting.zoom_link as string,
+        }
+      } else {
+        const nextThursday = getNextThursdayET()
+        meetingVars = {
+          title: 'Christians Innovate Thursday Meeting',
+          date: etDateFmt(nextThursday),
+          time: '12:00 PM Eastern Time',
+          description: 'Join us for our weekly Christians Innovate community meeting.',
+          zoom_link: siteUrl,
+        }
+      }
+
+      return sendOne({ user: sampleUser, meeting: meetingVars, site_url: siteUrl })
+    }
+
+    if (templateId === 'weekly-digest') {
+      const serviceSupabase = createServiceClient()
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000).toISOString()
+      const { data: posts } = await serviceSupabase
+        .from('launch_prayer_posts')
+        .select('type')
+        .eq('is_active', true)
+        .eq('is_hidden', false)
+        .gte('created_at', sevenDaysAgo)
+
+      const postList = posts ?? []
+      return sendOne({
+        user: sampleUser,
+        digest: {
+          launches: postList.filter((p) => p.type === 'launch').length,
+          prayers: postList.filter((p) => p.type === 'prayer').length,
+          wins: postList.filter((p) => p.type === 'win').length,
+        },
+        site_url: siteUrl,
+      })
+    }
+
+    // Generic template
+    return sendOne({ user: sampleUser, site_url: siteUrl })
+  }
+
+  // Custom email — render manually and use sendEmail directly
+  if (!customSubject || !customBody) return { error: 'Subject and body are required' }
+
+  const unsubscribeLink = generateUnsubscribeUrl(user.id, testEmail)
+  const rendered = renderEmailTemplate(customSubject, customBody, null, {
+    user: sampleUser,
+    unsubscribe_link: unsubscribeLink,
+  })
+
+  try {
+    const result = await sendEmail({
+      to: testEmail,
+      subject: rendered.subject,
+      html: rendered.html,
+      from: fromEmail,
+      userId: user.id,
+      metadata: { type: 'test' },
+    })
+    if (!result.success) return { error: result.error || 'Failed to send test email' }
+    return { success: true }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Failed to send test email' }
+  }
+}
+
 export async function getRecipientCount(filter: string) {
   const supabase = await createClient()
 

@@ -28,40 +28,6 @@ export async function createPlan(formData: FormData) {
   return { success: true }
 }
 
-export async function setDefaultPlan(planId: string) {
-  const supabase = await createClient()
-
-  // Verify admin
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Not authenticated' }
-
-  const { data: role } = await supabase
-    .from('user_roles')
-    .select('is_admin')
-    .eq('user_id', user.id)
-    .single()
-  if (!role?.is_admin) return { error: 'Not authorized' }
-
-  // Clear any existing default first
-  const { error: clearError } = await supabase
-    .from('reading_plans')
-    .update({ is_default: false })
-    .eq('is_default', true)
-
-  if (clearError) return { error: clearError.message }
-
-  // Set the new default
-  const { error } = await supabase
-    .from('reading_plans')
-    .update({ is_default: true })
-    .eq('id', planId)
-
-  if (error) return { error: error.message }
-
-  revalidatePath('/admin/plans')
-  return { success: true }
-}
-
 export async function deletePlan(planId: string) {
   const supabase = await createClient()
 

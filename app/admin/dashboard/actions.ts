@@ -373,9 +373,31 @@ export async function getPlanSubscribers(planId: string) {
     const completionPercentage = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0
     const lastActivity = completedDays[0]?.completed_at || null
 
-    // Find current day (next incomplete day)
+    // Find current day: the day after the highest day_number they've completed.
+    // Using max completed rather than "first incomplete in sequence" so that
+    // users who started mid-plan (e.g. joined at day 44) don't incorrectly
+    // show "Current: Day 1" just because early days are unmarked.
     const completedDayIds = new Set(completedDays.map((d: { day_id: string }) => d.day_id))
-    const nextIncompleteDay = planDays?.find((day: { id: string; day_number: number }) => !completedDayIds.has(day.id))
+
+    let currentDay: number | null = null
+    if (completedCount === 0) {
+      // Never started — point to the first day of the plan
+      currentDay = planDays?.[0]?.day_number ?? 1
+    } else {
+      const completedDayNumbers = planDays
+        ?.filter((day: { id: string; day_number: number }) => completedDayIds.has(day.id))
+        .map((day: { id: string; day_number: number }) => day.day_number) ?? []
+
+      if (completedDayNumbers.length > 0) {
+        const maxCompleted = Math.max(...completedDayNumbers)
+        const nextNumber = maxCompleted + 1
+        const nextDay = planDays?.find(
+          (day: { id: string; day_number: number }) => day.day_number === nextNumber
+        )
+        // null means they've finished the plan (no next day exists)
+        currentDay = nextDay ? nextNumber : null
+      }
+    }
 
     return {
       user_id: subscription.user_id,
@@ -386,7 +408,7 @@ export async function getPlanSubscribers(planId: string) {
       completed_days: completedCount,
       completion_percentage: completionPercentage,
       last_activity: lastActivity,
-      current_day: nextIncompleteDay?.day_number || null,
+      current_day: currentDay,
     }
   })
 

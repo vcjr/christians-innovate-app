@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useFormStatus } from 'react-dom'
-import { Loader2, Send, Users, Mail } from 'lucide-react'
+import { Loader2, Send, Users, Mail, FlaskConical } from 'lucide-react'
 import type { EmailTemplate } from '@/utils/email/types'
 import type { SenderAddress } from '@/utils/email/scheduled-jobs'
-import { sendBroadcast, getRecipientCount } from './actions'
+import { sendBroadcast, getRecipientCount, sendTestEmail } from './actions'
 import { EmailEditor } from '../templates/email-editor'
 import { VariablePicker } from '../templates/variable-picker'
 
@@ -56,6 +56,9 @@ export function BroadcastForm({ templates, senderAddresses }: BroadcastFormProps
     total: number
     warning?: string
   } | null>(null)
+  const [testEmail, setTestEmail] = useState('')
+  const [testSending, setTestSending] = useState(false)
+  const [testResult, setTestResult] = useState<{ success?: boolean; error?: string } | null>(null)
 
   // Fetch recipient count when filter changes
   useEffect(() => {
@@ -67,6 +70,20 @@ export function BroadcastForm({ templates, senderAddresses }: BroadcastFormProps
     }
     fetchCount()
   }, [recipientFilter])
+
+  async function handleTestSend() {
+    setTestResult(null)
+    setTestSending(true)
+    const fd = new FormData()
+    fd.set('test_email', testEmail)
+    fd.set('template_id', selectedTemplate)
+    fd.set('from_email', selectedFrom)
+    if (customSubject) fd.set('custom_subject', customSubject)
+    if (selectedTemplate === 'custom') fd.set('custom_body', customBody)
+    const result = await sendTestEmail(fd)
+    setTestResult(result ?? { error: 'Unknown error' })
+    setTestSending(false)
+  }
 
   async function handleSubmit(formData: FormData) {
     setError(null)
@@ -367,6 +384,51 @@ export function BroadcastForm({ templates, senderAddresses }: BroadcastFormProps
             </div>
           </>
         ) : null}
+      </div>
+
+      {/* Test Send */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="flex items-center gap-2 mb-1">
+          <FlaskConical className="w-5 h-5 text-gray-600" />
+          <h2 className="text-lg font-semibold text-gray-900">Send Test</h2>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">
+          Send this email to a single address before broadcasting to the full list.
+        </p>
+
+        <div className="flex gap-3 items-start">
+          <input
+            type="email"
+            value={testEmail}
+            onChange={(e) => { setTestEmail(e.target.value); setTestResult(null) }}
+            placeholder="test@example.com"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+          />
+          <button
+            type="button"
+            onClick={handleTestSend}
+            disabled={testSending || !testEmail}
+            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm font-medium whitespace-nowrap"
+          >
+            {testSending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <FlaskConical className="w-4 h-4" />
+                Send Test
+              </>
+            )}
+          </button>
+        </div>
+
+        {testResult && (
+          <div className={`mt-3 text-sm px-3 py-2 rounded-lg ${testResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+            {testResult.success ? `✓ Test email sent to ${testEmail}` : `✗ ${testResult.error}`}
+          </div>
+        )}
       </div>
 
       {/* Send Button */}

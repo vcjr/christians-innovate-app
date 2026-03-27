@@ -433,27 +433,23 @@ INSERT INTO public.email_templates (
             <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                 <tr><td width="50%" valign="top" class="stack" style="padding-right: 8px; padding-bottom: 8px;">
                 <div style="background-color: #f8fafc; border: 1px solid #f3f4f6; border-radius: 16px; padding: 20px;">
-                    <p style="margin: 0 0 6px 0; font-size: 22px; line-height: 1;">👤</p>
-                    <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; color: #111827;">Complete your profile</p>
+                    <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; color: #111827;">👤 Complete your profile</p>
                     <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 13px; color: #6b7280; line-height: 1.5;">Share your skills, interests, and what you''re building.</p>
                 </div>
             </td><td width="50%" valign="top" class="stack" style="padding-left: 8px; padding-bottom: 8px;">
                 <div style="background-color: #f8fafc; border: 1px solid #f3f4f6; border-radius: 16px; padding: 20px;">
-                    <p style="margin: 0 0 6px 0; font-size: 22px; line-height: 1;">📖</p>
-                    <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; color: #111827;">Join a reading plan</p>
+                    <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; color: #111827;">📖 Join a reading plan</p>
                     <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 13px; color: #6b7280; line-height: 1.5;">Stay grounded daily with our Bible reading plans.</p>
                 </div>
             </td></tr>
                 <tr><td width="50%" valign="top" class="stack" style="padding-right: 8px;">
                 <div style="background-color: #f8fafc; border: 1px solid #f3f4f6; border-radius: 16px; padding: 20px;">
-                    <p style="margin: 0 0 6px 0; font-size: 22px; line-height: 1;">🤝</p>
-                    <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; color: #111827;">Connect with members</p>
+                    <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; color: #111827;">🤝 Connect with members</p>
                     <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 13px; color: #6b7280; line-height: 1.5;">Browse the directory to find collaborators and accountability partners.</p>
                 </div>
             </td><td width="50%" valign="top" class="stack" style="padding-left: 8px;">
                 <div style="background-color: #f8fafc; border: 1px solid #f3f4f6; border-radius: 16px; padding: 20px;">
-                    <p style="margin: 0 0 6px 0; font-size: 22px; line-height: 1;">🚀</p>
-                    <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; color: #111827;">Share your journey</p>
+                    <p style="margin: 0 0 4px 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 15px; font-weight: 700; color: #111827;">🚀 Share your journey</p>
                     <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, ''Segoe UI'', Arial, Helvetica, sans-serif; font-size: 13px; color: #6b7280; line-height: 1.5;">Post launches, prayer requests, and wins in the community feed.</p>
                 </div>
             </td></tr>
