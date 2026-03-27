@@ -32,24 +32,20 @@ export default async function DiscoverGroupsPage() {
     .eq('requester_id', user.id)
   const requestByGroupId = new Map((userRequests || []).map(r => [r.group_id, r]))
 
-  // All memberships for member counts and avatars
-  const { data: allMemberships } = groupIds.length > 0
-    ? await supabase.from('user_group_memberships').select('group_id, user_id').in('group_id', groupIds)
-    : { data: [] }
-
-  const memberUserIdsByGroup = new Map<string, string[]>()
-  for (const m of (allMemberships || [])) {
-    const list = memberUserIdsByGroup.get(m.group_id) || []
-    list.push(m.user_id)
-    memberUserIdsByGroup.set(m.group_id, list)
+  // Member counts + avatar previews via SECURITY DEFINER function (privacy-preserving)
+  type MemberPreview = {
+    group_id: string
+    member_count: number
+    preview_names: (string | null)[]
+    preview_avatars: (string | null)[]
   }
+  const { data: memberPreviews } = groupIds.length > 0
+    ? await supabase.rpc('get_groups_member_preview', { p_group_ids: groupIds })
+    : { data: [] as MemberPreview[] }
 
-  // Batch fetch profiles for all members
-  const allMemberUserIds = [...new Set((allMemberships || []).map(m => m.user_id))]
-  const { data: profiles } = allMemberUserIds.length > 0
-    ? await supabase.from('user_profiles').select('user_id, full_name, avatar_url').in('user_id', allMemberUserIds)
-    : { data: [] }
-  const profilesById = new Map((profiles || []).map(p => [p.user_id, p]))
+  const memberPreviewByGroup = new Map<string, MemberPreview>(
+    (memberPreviews as MemberPreview[] || []).map(p => [p.group_id, p])
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -79,9 +75,10 @@ export default async function DiscoverGroupsPage() {
         ) : (
           <div className="space-y-4">
             {groups.map(group => {
-              const memberIds = memberUserIdsByGroup.get(group.id) || []
-              const memberCount = memberIds.length
-              const previewProfiles = memberIds.slice(0, 4).map(id => profilesById.get(id)).filter(Boolean)
+              const preview = memberPreviewByGroup.get(group.id)
+              const memberCount = preview?.member_count ?? 0
+              const previewNames: (string | null)[] = preview?.preview_names ?? []
+              const previewAvatars: (string | null)[] = preview?.preview_avatars ?? []
               const isMember = memberGroupIds.has(group.id)
               const existingRequest = requestByGroupId.get(group.id)
 
@@ -101,12 +98,12 @@ export default async function DiscoverGroupsPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex -space-x-2">
-                          {previewProfiles.map((profile, i) => (
-                            profile?.avatar_url ? (
+                          {previewAvatars.slice(0, 4).map((avatarUrl, i) => (
+                            avatarUrl ? (
                               <img
                                 key={i}
-                                src={profile.avatar_url}
-                                alt={profile.full_name || ''}
+                                src={avatarUrl}
+                                alt={previewNames[i] || ''}
                                 className="w-7 h-7 rounded-full border-2 border-white object-cover"
                               />
                             ) : (
@@ -114,7 +111,7 @@ export default async function DiscoverGroupsPage() {
                                 key={i}
                                 className="w-7 h-7 rounded-full border-2 border-white bg-blue-500 flex items-center justify-center text-white text-[10px] font-semibold"
                               >
-                                {(profile?.full_name || '?').charAt(0).toUpperCase()}
+                                {(previewNames[i] || '?').charAt(0).toUpperCase()}
                               </div>
                             )
                           ))}
@@ -150,3 +147,4 @@ export default async function DiscoverGroupsPage() {
     </div>
   )
 }
+

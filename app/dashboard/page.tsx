@@ -83,11 +83,15 @@ export default async function Dashboard({
     }
   }
 
-  // 3. Fetch all reading plans
-  const { data: allPlans } = await supabase
-    .from('reading_plans')
-    .select('*')
-    .order('created_at', { ascending: false })
+  // 3. Fetch all reading plans (only when user has no active subscription)
+  let availablePlans = null
+  if (subscribedPlanIds.length === 0) {
+    const { data } = await supabase
+      .from('reading_plans')
+      .select('*')
+      .order('created_at', { ascending: false })
+    availablePlans = data
+  }
 
   // 4. If subscribed, fetch plan details + view-specific data
   let currentPlan = null
@@ -116,6 +120,63 @@ export default async function Dashboard({
       listData = { days: listResult.days, hasMore: listResult.hasMore }
     }
   }
+
+  // Shared Accountability widget (rendered in both subscribed and unsubscribed views)
+  const AccountabilityWidget = accountabilityStats ? (
+    <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Target className="h-5 w-5 text-purple-600" />
+          <h3 className="text-lg font-semibold text-gray-900">Accountability</h3>
+        </div>
+        <Link
+          href="/accountability"
+          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+        >
+          View Group →
+        </Link>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-600">Group</span>
+          <span className="font-medium text-gray-900">{accountabilityStats.groupName}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-600 flex items-center gap-1">
+            <TrendingUp className="h-4 w-4" />
+            Active Commitments
+          </span>
+          <span className="font-bold text-purple-600">{accountabilityStats.activeCommitments}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-600 flex items-center gap-1">
+            <Users className="h-4 w-4" />
+            Members
+          </span>
+          <span className="font-medium text-gray-900">{accountabilityStats.memberCount}</span>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
+      <div className="flex items-start gap-3">
+        <Target className="h-6 w-6 text-purple-600 flex-shrink-0 mt-1" />
+        <div className="flex-1">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Join an Accountability Group</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Stay on track with your goals by joining a group of like-minded believers who will support and challenge you.
+          </p>
+          <Link
+            href="/accountability"
+            className="inline-block px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm"
+          >
+            Get Started
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -153,9 +214,9 @@ export default async function Dashboard({
               </div>
             )}
 
-            {allPlans && allPlans.length > 0 ? (
+            {availablePlans && availablePlans.length > 0 ? (
               <div className="space-y-4">
-                {allPlans.map((plan) => (
+                {availablePlans.map((plan) => (
                   <div key={plan.id} className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 shadow-sm hover:shadow-md transition">
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                       <div className="flex-1">
@@ -182,61 +243,7 @@ export default async function Dashboard({
             <LaunchPrayerPreview />
 
             {/* Accountability Widget */}
-            {accountabilityStats ? (
-              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-purple-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">Accountability</h3>
-                  </div>
-                  <Link
-                    href="/accountability"
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    View Group →
-                  </Link>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Group</span>
-                    <span className="font-medium text-gray-900">{accountabilityStats.groupName}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      <TrendingUp className="h-4 w-4" />
-                      Active Commitments
-                    </span>
-                    <span className="font-bold text-purple-600">{accountabilityStats.activeCommitments}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      Members
-                    </span>
-                    <span className="font-medium text-gray-900">{accountabilityStats.memberCount}</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-                <div className="flex items-start gap-3">
-                  <Target className="h-6 w-6 text-purple-600 flex-shrink-0 mt-1" />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Join an Accountability Group</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Stay on track with your goals by joining a group of like-minded believers who will support and challenge you.
-                    </p>
-                    <Link
-                      href="/accountability"
-                      className="inline-block px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm"
-                    >
-                      Get Started
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
+            {AccountabilityWidget}
           </div>
         )}
 
@@ -289,61 +296,7 @@ export default async function Dashboard({
             <LaunchPrayerPreview />
 
             {/* Accountability Widget */}
-            {accountabilityStats ? (
-              <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-purple-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">Accountability</h3>
-                  </div>
-                  <Link
-                    href="/accountability"
-                    className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    View Group →
-                  </Link>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Group</span>
-                    <span className="font-medium text-gray-900">{accountabilityStats.groupName}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      <TrendingUp className="h-4 w-4" />
-                      Active Commitments
-                    </span>
-                    <span className="font-bold text-purple-600">{accountabilityStats.activeCommitments}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      Members
-                    </span>
-                    <span className="font-medium text-gray-900">{accountabilityStats.memberCount}</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-                <div className="flex items-start gap-3">
-                  <Target className="h-6 w-6 text-purple-600 flex-shrink-0 mt-1" />
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Join an Accountability Group</h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Stay on track with your goals by joining a group of like-minded believers who will support and challenge you.
-                    </p>
-                    <Link
-                      href="/accountability"
-                      className="inline-block px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium text-sm"
-                    >
-                      Get Started
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            )}
+            {AccountabilityWidget}
           </div>
         )}
       </div>

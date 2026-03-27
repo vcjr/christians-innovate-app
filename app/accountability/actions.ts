@@ -163,12 +163,12 @@ export async function leaveGroup(groupId: string) {
       .eq('id', groupId)
   } else if (groupInfo && groupInfo.created_by !== user.id) {
     // Notify the group creator that a member left
-    await supabase.from('notifications').insert({
-      user_id: groupInfo.created_by,
-      type: 'member_left',
-      title: 'Member Left Group',
-      message: `${leavingProfile?.full_name || 'A member'} has left "${groupInfo.name}"`,
-      link: '/accountability',
+    await supabase.rpc('create_notification_for_user', {
+      p_user_id: groupInfo.created_by,
+      p_type: 'member_left',
+      p_title: 'Member Left Group',
+      p_message: `${leavingProfile?.full_name || 'A member'} has left "${groupInfo.name}"`,
+      p_link: '/accountability',
     })
   }
 
@@ -231,12 +231,12 @@ export async function removeMember(formData: FormData) {
 
   // Notify the removed member
   if (groupInfo) {
-    await supabase.from('notifications').insert({
-      user_id: memberUserId,
-      type: 'member_removed',
-      title: 'Removed from Group',
-      message: `You have been removed from "${groupInfo.name}"`,
-      link: '/accountability',
+    await supabase.rpc('create_notification_for_user', {
+      p_user_id: memberUserId,
+      p_type: 'member_removed',
+      p_title: 'Removed from Group',
+      p_message: `You have been removed from "${groupInfo.name}"`,
+      p_link: '/accountability',
     })
   }
 
@@ -299,12 +299,12 @@ export async function transferOwnership(formData: FormData) {
 
   // Notify the new owner
   if (groupInfo) {
-    await supabase.from('notifications').insert({
-      user_id: newOwnerId,
-      type: 'ownership_transferred',
-      title: 'You Are Now Group Owner',
-      message: `${currentOwnerProfile?.full_name || 'The previous owner'} made you the owner of "${groupInfo.name}"`,
-      link: '/accountability',
+    await supabase.rpc('create_notification_for_user', {
+      p_user_id: newOwnerId,
+      p_type: 'ownership_transferred',
+      p_title: 'You Are Now Group Owner',
+      p_message: `${currentOwnerProfile?.full_name || 'The previous owner'} made you the owner of "${groupInfo.name}"`,
+      p_link: '/accountability',
     })
   }
 
@@ -504,14 +504,16 @@ export async function updateRhythmConfig(formData: FormData) {
       .neq('user_id', user.id)
 
     if (otherMembers && otherMembers.length > 0) {
-      await supabase.from('notifications').insert(
-        otherMembers.map(m => ({
-          user_id: m.user_id,
-          type: 'rhythm_updated',
-          title: 'Meeting Schedule Updated',
-          message: `"${groupInfo.name}" now meets ${frequency} on ${day2 ? `${day}s & ${day2}s` : `${day}s`} at ${time}`,
-          link: '/accountability',
-        }))
+      await Promise.all(
+        otherMembers.map(m =>
+          supabase.rpc('create_notification_for_user', {
+            p_user_id: m.user_id,
+            p_type: 'rhythm_updated',
+            p_title: 'Meeting Schedule Updated',
+            p_message: `"${groupInfo.name}" now meets ${frequency} on ${day2 ? `${day}s at ${time} & ${day2}s at ${time2 || time}` : `${day}s at ${time}`}`,
+            p_link: '/accountability',
+          })
+        )
       )
     }
   }
@@ -775,16 +777,14 @@ export async function sendGroupInvitation(targetUserId: string, groupId?: string
   }
 
   // Notify the invited user
-  const { error: notifError } = await supabase
-    .from('notifications')
-    .insert({
-      user_id: targetUserId,
-      type: 'group_invitation',
-      title: 'Group Invitation',
-      message: `${profile?.full_name || 'Someone'} invited you to join "${group.name}"`,
-      link: '/accountability',
-      reference_id: invitation.id,
-    })
+  const { error: notifError } = await supabase.rpc('create_notification_for_user', {
+    p_user_id: targetUserId,
+    p_type: 'group_invitation',
+    p_title: 'Group Invitation',
+    p_message: `${profile?.full_name || 'Someone'} invited you to join "${group.name}"`,
+    p_link: '/accountability',
+    p_reference_id: invitation.id,
+  })
 
   if (notifError) {
     console.error('Error creating notification:', notifError)
@@ -828,13 +828,13 @@ export async function acceptInvitation(invitationId: string) {
       .eq('user_id', user.id)
       .single()
 
-    await supabase.from('notifications').insert({
-      user_id: invitation.invited_by,
-      type: 'invitation_accepted',
-      title: 'Invitation Accepted',
-      message: `${accepterProfile?.full_name || 'Someone'} accepted your invitation to join "${groupName}"`,
-      link: '/accountability',
-      reference_id: invitationId,
+    await supabase.rpc('create_notification_for_user', {
+      p_user_id: invitation.invited_by,
+      p_type: 'invitation_accepted',
+      p_title: 'Invitation Accepted',
+      p_message: `${accepterProfile?.full_name || 'Someone'} accepted your invitation to join "${groupName}"`,
+      p_link: '/accountability',
+      p_reference_id: invitationId,
     })
   }
 
@@ -885,13 +885,13 @@ export async function declineInvitation(invitationId: string) {
       .eq('user_id', user.id)
       .single()
 
-    await supabase.from('notifications').insert({
-      user_id: invitation.invited_by,
-      type: 'invitation_declined',
-      title: 'Invitation Declined',
-      message: `${declinerProfile?.full_name || 'Someone'} declined your invitation to join "${groupName}"`,
-      link: '/directory',
-      reference_id: invitationId,
+    await supabase.rpc('create_notification_for_user', {
+      p_user_id: invitation.invited_by,
+      p_type: 'invitation_declined',
+      p_title: 'Invitation Declined',
+      p_message: `${declinerProfile?.full_name || 'Someone'} declined your invitation to join "${groupName}"`,
+      p_link: '/directory',
+      p_reference_id: invitationId,
     })
   }
 
@@ -1008,19 +1008,19 @@ export async function requestToJoinGroup(groupId: string, message?: string) {
   ])
 
   if (group) {
-    await supabase.from('notifications').insert({
-      user_id: group.created_by,
-      type: 'join_request',
-      title: 'New Join Request',
-      message: `${profile?.full_name || 'Someone'} wants to join "${group.name}"`,
-      link: '/accountability',
-      reference_id: request.id,
+    await supabase.rpc('create_notification_for_user', {
+      p_user_id: group.created_by,
+      p_type: 'join_request',
+      p_title: 'New Join Request',
+      p_message: `${profile?.full_name || 'Someone'} wants to join "${group.name}"`,
+      p_link: '/accountability',
+      p_reference_id: request.id,
     })
   }
 
   revalidatePath('/accountability/discover')
   revalidatePath('/accountability')
-  return { success: true }
+  return { success: true, requestId: request.id }
 }
 
 export async function approveJoinRequest(requestId: string) {
@@ -1040,13 +1040,13 @@ export async function approveJoinRequest(requestId: string) {
 
   if (req) {
     const groupName = (req.accountability_groups as any)?.name || 'the group'
-    await supabase.from('notifications').insert({
-      user_id: req.requester_id,
-      type: 'join_request_approved',
-      title: 'Join Request Approved',
-      message: `Your request to join "${groupName}" has been approved!`,
-      link: '/accountability',
-      reference_id: requestId,
+    await supabase.rpc('create_notification_for_user', {
+      p_user_id: req.requester_id,
+      p_type: 'join_request_approved',
+      p_title: 'Join Request Approved',
+      p_message: `Your request to join "${groupName}" has been approved!`,
+      p_link: '/accountability',
+      p_reference_id: requestId,
     })
   }
 
@@ -1060,31 +1060,37 @@ export async function rejectJoinRequest(requestId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { data: req } = await supabase
+  const { data: req, error: fetchError } = await supabase
     .from('group_join_requests')
     .select('requester_id, group_id, accountability_groups(name)')
     .eq('id', requestId)
     .single()
 
+  if (fetchError) {
+    return { error: fetchError.message || 'Failed to load join request' }
+  }
+
+  if (!req || !(req as any).group_id) {
+    return { error: 'Join request not found or inaccessible' }
+  }
+
   const { error } = await supabase
     .from('group_join_requests')
     .update({ status: 'rejected', responded_at: new Date().toISOString() })
     .eq('id', requestId)
-    .eq('group_id', (req as any)?.group_id)
+    .eq('group_id', (req as any).group_id)
 
   if (error) return { error: error.message || 'Failed to reject request' }
 
-  if (req) {
-    const groupName = (req.accountability_groups as any)?.name || 'a group'
-    await supabase.from('notifications').insert({
-      user_id: req.requester_id,
-      type: 'join_request_rejected',
-      title: 'Join Request Declined',
-      message: `Your request to join "${groupName}" was not approved at this time.`,
-      link: '/accountability/discover',
-      reference_id: requestId,
-    })
-  }
+  const groupName = (req.accountability_groups as any)?.name || 'a group'
+  await supabase.rpc('create_notification_for_user', {
+    p_user_id: req.requester_id,
+    p_type: 'join_request_rejected',
+    p_title: 'Join Request Declined',
+    p_message: `Your request to join "${groupName}" was not approved at this time.`,
+    p_link: '/accountability/discover',
+    p_reference_id: requestId,
+  })
 
   revalidatePath('/accountability')
   revalidatePath('/accountability/discover')

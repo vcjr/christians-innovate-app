@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mail, Check, X, Loader2, Users } from 'lucide-react'
 import { acceptInvitation, declineInvitation } from '@/app/accountability/actions'
@@ -31,6 +31,10 @@ export function PendingInvitations({ invitations: initialInvitations }: PendingI
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
+  useEffect(() => {
+    setInvitations(initialInvitations)
+  }, [initialInvitations])
+
   const showToast = (text: string, type: 'success' | 'error') => {
     setToastMessage({ text, type })
     setTimeout(() => setToastMessage(null), 3000)
@@ -43,6 +47,7 @@ export function PendingInvitations({ invitations: initialInvitations }: PendingI
       if (result.error) {
         showToast(result.error, 'error')
       } else {
+        setInvitations(prev => prev.filter(i => i.id !== invitationId))
         showToast(`You joined "${groupName}"!`, 'success')
         router.refresh()
       }

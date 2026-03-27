@@ -43,7 +43,7 @@ export default async function AdminDashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
-
+            Admin dashboard
           </h1>
           <p className="text-sm sm:text-base text-gray-600">
             Monitor subscriber engagement and reading progress

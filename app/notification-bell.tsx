@@ -37,7 +37,16 @@ export function NotificationBell({ notifications, unreadCount, userId }: Notific
 
   // Use the live unread count for the badge, adjusted for local reads/dismisses.
   const locallyReadCount = [...readIds].filter(id => liveNotifications.some(n => n.id === id && !n.is_read)).length
-  const displayUnreadCount = Math.max(0, liveUnreadCount - locallyReadCount - dismissedIds.size)
+  const dismissedUnreadCount = liveNotifications.filter(
+    n => dismissedIds.has(n.id) && !n.is_read && !readIds.has(n.id)
+  ).length
+  const displayUnreadCount = Math.max(0, liveUnreadCount - locallyReadCount - dismissedUnreadCount)
+
+  // Keep local live state in sync when server-provided props change (e.g. after router.refresh())
+  useEffect(() => {
+    setLiveNotifications(notifications)
+    setLiveUnreadCount(unreadCount)
+  }, [notifications, unreadCount])
 
   // Realtime subscription — prepend new notifications as they arrive
   useEffect(() => {
@@ -89,6 +98,10 @@ export function NotificationBell({ notifications, unreadCount, userId }: Notific
 
   const handleClearAll = async () => {
     await clearAllNotifications()
+    setLiveNotifications([])
+    setLiveUnreadCount(0)
+    setReadIds(new Set())
+    setDismissedIds(new Set())
     router.refresh()
   }
 
