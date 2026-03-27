@@ -59,6 +59,12 @@ export default async function AdminLayout({
                 >
                   Members
                 </a>
+                <a
+                  href="/admin/email"
+                  className="hover:text-blue-200 font-medium transition"
+                >
+                  Email
+                </a>
               </div>
             </div>
           </div>

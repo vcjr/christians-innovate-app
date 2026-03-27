@@ -3,12 +3,15 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Settings, ChevronDown } from 'lucide-react'
+import { Settings, ChevronDown, Shield, LogOut, Loader2 } from 'lucide-react'
+import { signOut } from '@/app/actions'
+import { clearLocalSessionData } from '@/utils/auth/cleanup'
 
 interface UserProfileDropdownProps {
   fullName: string | null
   avatarUrl: string | null
   userId: string
+  isAdmin?: boolean
 }
 
 function getInitials(name: string | null): string {
@@ -34,21 +37,31 @@ function getAvatarColor(userId: string): string {
   return colors[index]
 }
 
-export function UserProfileDropdown({ fullName, avatarUrl, userId }: UserProfileDropdownProps) {
+export function UserProfileDropdown({ fullName, avatarUrl, userId, isAdmin }: UserProfileDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false)
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true)
+    try {
+      await clearLocalSessionData()
+      await signOut()
+    } catch (error) {
+      console.error('Sign out failed:', error)
+      setIsSigningOut(false)
+    }
+  }
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -56,7 +69,6 @@ export function UserProfileDropdown({ fullName, avatarUrl, userId }: UserProfile
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 transition"
       >
-        {/* Avatar */}
         {avatarUrl ? (
           <Image
             src={avatarUrl}
@@ -70,13 +82,10 @@ export function UserProfileDropdown({ fullName, avatarUrl, userId }: UserProfile
             {getInitials(fullName)}
           </div>
         )}
-
-        {/* My Profile text */}
         <span className="text-sm font-medium text-gray-700">My Profile</span>
         <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
           <Link
@@ -87,6 +96,33 @@ export function UserProfileDropdown({ fullName, avatarUrl, userId }: UserProfile
             <Settings className="h-4 w-4" />
             Settings
           </Link>
+
+          {isAdmin && (
+            <Link
+              href="/admin/dashboard"
+              onClick={() => setIsOpen(false)}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition"
+            >
+              <Shield className="h-4 w-4" />
+              Admin
+            </Link>
+          )}
+
+          <div className="border-t border-gray-100 my-1" />
+
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSigningOut ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <LogOut className="h-4 w-4" />
+            )}
+            {isSigningOut ? 'Signing out...' : 'Sign Out'}
+          </button>
         </div>
       )}
     </div>

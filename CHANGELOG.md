@@ -12,7 +12,164 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-*No unreleased changes yet.*
+---
+
+## [0.5.0] - 2026-03-27
+
+### Victor Crispin — [@vcjr](https://github.com/vcjr)
+
+**Multi-Group Accountability Membership** — CI-6
+
+Users can now belong to multiple accountability groups simultaneously. The single `accountability_group_id` foreign key on `user_profiles` has been replaced with a `user_group_memberships` junction table, unlocking true many-to-many group membership.
+
+- Migration `20260326000000`: creates `user_group_memberships`, migrates existing data, drops old column, adds `NOT NULL` on `group_commitments.status`, hardens `SECURITY DEFINER` functions with `SET search_path`, splits overly-broad `FOR ALL` RLS policies into granular SELECT/INSERT/UPDATE/DELETE, fixes `accept_group_invitation` with row-count verification
+- All server actions, RLS policies, dashboard queries, and directory queries updated to use the junction table
+- Group switcher always visible on `/accountability` — one tab per group, `+ New Group`, and `Discover Groups` links
+
+**Group Discovery & Join Requests** — CI-6
+
+New `/accountability/discover` page lets any authenticated member browse all groups, see member counts and avatar previews, and request to join. Group creators review and act on pending requests inline above their hub.
+
+- Migration `20260327000000`: `group_join_requests` table with RLS + `approve_join_request()` SECURITY DEFINER function (needed because normal RLS restricts `user_group_memberships` inserts to self)
+- Migration `20260327000001`: opens `user_group_memberships` SELECT to all authenticated users so the discover page can display member counts for groups the viewer hasn't joined
+- New server actions: `requestToJoinGroup`, `approveJoinRequest`, `rejectJoinRequest`, `cancelJoinRequest`
+- New components: `JoinRequestButton` (3 states: request / pending+cancel / request again) and `PendingJoinRequests` (creator approve/decline panel)
+- Discover Groups card added to the onboarding empty state
+
+**Comprehensive Notification System with Realtime** — CI-6
+
+The notification bell now updates live without a page reload, and every meaningful accountability event triggers a notification.
+
+- Migration `20260327000002`: adds `notifications` table to the Supabase Realtime publication
+- `NotificationBell` subscribes to `INSERT` events filtered to the current user via Supabase channel — badge increments instantly when a new notification arrives
+- New notification types added across all accountability actions:
+
+| Type | Trigger | Recipient |
+|---|---|---|
+| `invitation_accepted` | Invitee accepts | Inviter |
+| `invitation_declined` | Invitee declines | Inviter |
+| `join_request` | User requests to join | Group creator |
+| `join_request_approved` | Creator approves | Requester |
+| `join_request_rejected` | Creator rejects | Requester |
+| `member_removed` | Creator removes member | Removed member |
+| `member_left` | Member leaves | Group creator |
+| `ownership_transferred` | Ownership transferred | New owner |
+| `rhythm_updated` | Meeting schedule changed | All other members |
+
+**Bi-Weekly Rhythm: Two Days with Independent Times** — CI-6
+
+When bi-weekly frequency is selected, a second day picker and its own time input appear. Both calendar exports are updated to reflect per-day schedules.
+
+- Second day selector (filtered to exclude day 1); time picker disabled until a day is chosen
+- Google Calendar: opens two separate recurring-event tabs, one per day
+- ICS export: single `.ics` file with two `VEVENT` blocks so both events import together
+- Dashboard widget shows `Mondays @ 9:00 AM · Thursdays @ 6:00 PM` format
+- `rhythm_updated` notification includes both days in the message
+
+**Admin Dashboard Restored** — CI-6
+
+The analytics dashboard (`/admin/dashboard`) was missing from the working branch after a prior "archive" commit. Restored `actions.ts`, `page.tsx`, `stats-cards.tsx`, and the Dashboard nav link in the admin layout.
+
+**Navigation Refactor** — CI-6
+
+Moved Admin link and Sign Out out of the main nav bar and into `UserProfileDropdown` to free nav real estate as features grow. Sign Out now shows a loading state while `clearLocalSessionData` runs before session invalidation.
+
+**Bug Fixes** — CI-6
+
+- Removed stale `user_profiles.accountability_group_id` references from `/dashboard` and `/accountability/create` after the column was dropped
+- Fixed group picker modal expanding the page width by rendering it outside the main container via a React fragment
+- Normalized `/accountability` page padding to match the nav's `max-w-7xl px-4 sm:px-6 lg:px-8` width
+- Updated create-group guidelines to reflect that multiple groups are now permitted
+
+---
+
+**Transactional Email System** — CI-30
+
+A full email infrastructure built on Resend, with a visual block-based template editor, scheduled delivery, and admin controls.
+
+- Migrations: `email_templates`, `email_logs`, `sender_addresses`, `scheduled_email_jobs` tables with RLS
+- `utils/email/blocks.ts` — block system with `composeEmail` / `decomposeEmail` / `renderBlock`; supports badge, hero, primary-cta, feature-grid, detail-card, two-column, stats-row, scripture, and divider blocks
+- `utils/email/scheduled-jobs.ts` — `sendEmail`, `sendBatchEmails`, `renderEmailTemplate`, job scheduler and processor
+- Admin email template editor at `/admin/email/templates` with live block picker, visual preview, subject/variable management, and save/publish flow
+- Seeded block-system versions of all four default templates: `daily-reminder`, `welcome`, `meeting-reminder`, `weekly-digest`
+
+**Admin Email Broadcast** — CI-30
+
+Admins can send a one-off email to any member segment directly from the admin panel.
+
+- `/admin/email/broadcast` page with recipient filter (all members, email-enabled, CI updates, Bible Year, skill share)
+- Live recipient count updates as filter changes
+- Template picker — choose a saved template or compose custom HTML via the block editor
+- **Test Send** — send to a single address before broadcasting to the full list; uses the admin's own profile as sample data for variable substitution; amber-styled panel with loading state and success/error feedback
+- `sendBroadcast` and `sendTestEmail` server actions; `getRecipientCount` for live count
+
+**Email Inbox (Inbound Webhooks)** — CI-30
+
+Inbound emails to the platform are received via Resend webhook and stored for admin review.
+
+- `/api/webhooks/resend-inbound` — verifies `RESEND_WEBHOOK_SECRET` HMAC signature before processing
+- Parsed inbound messages stored in `email_logs` with `direction = 'inbound'`
+
+**External Contacts** — CI-30
+
+- `external_contacts` table and migration — allows admins to store non-member email addresses for broadcast targeting
+
+**Fix: Admin Dashboard "Current: Day" Calculation** — CI-30
+
+The View Progress modal on the admin dashboard showed "Current: Day 1" for all subscribers regardless of actual progress. Fixed by calculating the current day as `max(completed day numbers) + 1` rather than finding the first sequential incomplete day, which always returned Day 1 for members who joined mid-year.
+
+**Fix: Welcome Email Feature Grid Emoji Rendering** — CI-30
+
+Feature-grid block emojis in the welcome email were rendering as a separate block-level `<p style="font-size: 22px">` element above the title instead of inline. Updated the stored template HTML and migration to place the emoji inline with the title text, matching what `renderFeatureGrid` generates.
+
+**Fix: Vercel Cron Job (Hobby Plan)** — CI-30
+
+Vercel Hobby plan only allows once-daily cron jobs. Changed the scheduler cron from `*/5 * * * *` to `0 8 * * *` (daily at 8 AM UTC) to unblock deployments without requiring a plan upgrade.
+
+---
+
+### Summary
+
+| Category | Details |
+|---|---|
+| **New features** | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm, transactional email system, broadcast with test send, inbound email inbox, external contacts, password reset flow, auth email templates |
+| **Bug fixes** | Stale column references, modal layout overflow, page width misalignment, admin "Current: Day 1" calculation, welcome email emoji rendering |
+| **Security** | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy, Resend webhook HMAC verification, current-password verification before password change |
+| **Auth** | `/auth/confirm` route handler, forgot-password, reset-password, change password in settings, change email in settings |
+| **Email templates** | 8 branded Supabase auth HTML templates in `supabase/email-templates/` |
+| **Navigation** | Admin + Sign Out moved to profile dropdown; "Forgot password?" link on login |
+| **DevOps** | Vercel cron schedule fixed for Hobby plan |
+| **Migrations** | 16 new migration files |
+| **Files changed** | 50+ files |
+
+---
+
+**Password Reset & Auth Email Flows** — CI-30
+
+Complete end-to-end auth email infrastructure that was previously missing, causing all Supabase auth confirmation links (signup, magic link, invite, password reset, email change) to 404.
+
+- `/app/auth/confirm/route.ts` — new route handler that exchanges Supabase `token_hash` for a session; routes by type: `recovery` → `/reset-password`, `email_change` → `/settings`, `signup`/`invite` → onboarding check, `magiclink` → dashboard
+- `/app/forgot-password` — public page + server action; calls `resetPasswordForEmail` and always returns success to prevent email enumeration
+- `/app/reset-password` — page with live password requirements checklist and match indicator; server action verifies rules, calls `updateUser`, signs user out, redirects to login with confirmation message
+- Middleware updated: `/forgot-password` added to public routes; `/reset-password` exempted from the onboarding iron gate
+- "Forgot password?" link added inline with the password label on `/login`
+- **Change Password** section added to `/settings` — verifies current password via `signInWithPassword` before calling `updateUser`; full requirements checklist inline
+- **Email Address** section added to `/settings` — replaces the disabled email field; calls `updateUser({ email })` which triggers Supabase's `change-email` confirmation flow
+
+**Supabase Auth Email Templates** — CI-30
+
+Eight branded HTML email templates in `supabase/email-templates/` for all Supabase Auth flows, matching the platform's visual style (blue gradient bar, logo header, rounded card, branded footer).
+
+| Template | File | Key variable |
+|---|---|---|
+| Confirm sign up | `confirm-signup.html` | `{{ .ConfirmationURL }}` |
+| Invite user | `invite-user.html` | `{{ .ConfirmationURL }}` |
+| Magic link | `magic-link.html` | `{{ .ConfirmationURL }}` |
+| Change email | `change-email.html` | `{{ .ConfirmationURL }}`, `{{ .NewEmail }}` |
+| Reset password | `reset-password.html` | `{{ .ConfirmationURL }}` |
+| Reauthentication | `reauthentication.html` | `{{ .Token }}` (OTP code block) |
+| Password changed | `password-changed.html` | Security notice + amber alert box |
+| Email address changed | `email-address-changed.html` | Old → new address detail card + amber alert box |
 
 ---
 
@@ -282,7 +439,8 @@ Added automated TypeScript type-checking to the CI workflow, catching type error
 
 ---
 
-[Unreleased]: https://github.com/vcjr/christians-innovate-app/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/vcjr/christians-innovate-app/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.1.0...v0.2.0
