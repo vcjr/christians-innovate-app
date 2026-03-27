@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [0.5.0] - 2026-03-27
+
 ### Victor Crispin — [@vcjr](https://github.com/vcjr)
 
 **Multi-Group Accountability Membership** — CI-6
@@ -128,13 +132,44 @@ Vercel Hobby plan only allows once-daily cron jobs. Changed the scheduler cron f
 
 | Category | Details |
 |---|---|
-| **New features** | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm, transactional email system, broadcast with test send, inbound email inbox, external contacts |
+| **New features** | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm, transactional email system, broadcast with test send, inbound email inbox, external contacts, password reset flow, auth email templates |
 | **Bug fixes** | Stale column references, modal layout overflow, page width misalignment, admin "Current: Day 1" calculation, welcome email emoji rendering |
-| **Security** | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy, Resend webhook HMAC verification |
-| **Navigation** | Admin + Sign Out moved to profile dropdown |
+| **Security** | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy, Resend webhook HMAC verification, current-password verification before password change |
+| **Auth** | `/auth/confirm` route handler, forgot-password, reset-password, change password in settings, change email in settings |
+| **Email templates** | 8 branded Supabase auth HTML templates in `supabase/email-templates/` |
+| **Navigation** | Admin + Sign Out moved to profile dropdown; "Forgot password?" link on login |
 | **DevOps** | Vercel cron schedule fixed for Hobby plan |
 | **Migrations** | 16 new migration files |
-| **Files changed** | 40+ files |
+| **Files changed** | 50+ files |
+
+---
+
+**Password Reset & Auth Email Flows** — CI-30
+
+Complete end-to-end auth email infrastructure that was previously missing, causing all Supabase auth confirmation links (signup, magic link, invite, password reset, email change) to 404.
+
+- `/app/auth/confirm/route.ts` — new route handler that exchanges Supabase `token_hash` for a session; routes by type: `recovery` → `/reset-password`, `email_change` → `/settings`, `signup`/`invite` → onboarding check, `magiclink` → dashboard
+- `/app/forgot-password` — public page + server action; calls `resetPasswordForEmail` and always returns success to prevent email enumeration
+- `/app/reset-password` — page with live password requirements checklist and match indicator; server action verifies rules, calls `updateUser`, signs user out, redirects to login with confirmation message
+- Middleware updated: `/forgot-password` added to public routes; `/reset-password` exempted from the onboarding iron gate
+- "Forgot password?" link added inline with the password label on `/login`
+- **Change Password** section added to `/settings` — verifies current password via `signInWithPassword` before calling `updateUser`; full requirements checklist inline
+- **Email Address** section added to `/settings` — replaces the disabled email field; calls `updateUser({ email })` which triggers Supabase's `change-email` confirmation flow
+
+**Supabase Auth Email Templates** — CI-30
+
+Eight branded HTML email templates in `supabase/email-templates/` for all Supabase Auth flows, matching the platform's visual style (blue gradient bar, logo header, rounded card, branded footer).
+
+| Template | File | Key variable |
+|---|---|---|
+| Confirm sign up | `confirm-signup.html` | `{{ .ConfirmationURL }}` |
+| Invite user | `invite-user.html` | `{{ .ConfirmationURL }}` |
+| Magic link | `magic-link.html` | `{{ .ConfirmationURL }}` |
+| Change email | `change-email.html` | `{{ .ConfirmationURL }}`, `{{ .NewEmail }}` |
+| Reset password | `reset-password.html` | `{{ .ConfirmationURL }}` |
+| Reauthentication | `reauthentication.html` | `{{ .Token }}` (OTP code block) |
+| Password changed | `password-changed.html` | Security notice + amber alert box |
+| Email address changed | `email-address-changed.html` | Old → new address detail card + amber alert box |
 
 ---
 
@@ -404,7 +439,8 @@ Added automated TypeScript type-checking to the CI workflow, catching type error
 
 ---
 
-[Unreleased]: https://github.com/vcjr/christians-innovate-app/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/vcjr/christians-innovate-app/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vcjr/christians-innovate-app/compare/v0.1.0...v0.2.0
