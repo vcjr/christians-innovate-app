@@ -4,6 +4,10 @@ import { useState, useEffect, useRef } from 'react'
 import { MessageSquareMore, X, Bug, Lightbulb, MessageCircle, Send, CheckCircle2, ImagePlus, Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
+function isSafeBlobUrl(url: string | null): url is string {
+  return typeof url === 'string' && /^blob:/.test(url)
+}
+
 const TYPES = [
   { value: 'bug', label: 'Bug Report', icon: Bug, color: 'text-red-600 bg-red-50 border-red-200' },
   { value: 'feature', label: 'Feature Idea', icon: Lightbulb, color: 'text-amber-600 bg-amber-50 border-amber-200' },
@@ -267,7 +271,7 @@ function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; user
                 <label className="text-sm font-semibold text-slate-700">
                   Screenshot <span className="text-slate-400 font-normal">(optional)</span>
                 </label>
-                {screenshotPreview ? (
+                {isSafeBlobUrl(screenshotPreview) ? (
                   <div className="relative inline-block">
                     <img
                       src={screenshotPreview}
