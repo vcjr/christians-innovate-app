@@ -6,6 +6,7 @@ import { NavigationBar } from './navigation'
 import { createClient } from '@/utils/supabase/server'
 import { AnnouncementBar } from './announcement-bar'
 import { NoticeHandler } from '@/components/ui/NoticeHandler'
+import { FeedbackButton } from '@/components/feedback-button'
 
 const CHROME_HIDDEN_ROUTES = ['/reset-password', '/onboarding']
 
@@ -78,6 +79,7 @@ export default async function RootLayout({
           <AnnouncementBar meeting={activeMeeting} userId={user.id} />
         )}
         {children}
+        {user && !hideChrome && <FeedbackButton userId={user.id} />}
       </body>
     </html>
   );
