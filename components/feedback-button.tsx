@@ -1,12 +1,20 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { MessageSquareMore, X, Bug, Lightbulb, MessageCircle, Send, CheckCircle2, ImagePlus, Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
 function isSafeBlobUrl(url: string | null): url is string {
   return typeof url === 'string' && /^blob:/.test(url)
 }
+
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]):not([tabindex="-1"]):not([aria-hidden="true"]), ' +
+  '[href]:not([tabindex="-1"]):not([aria-hidden="true"]), ' +
+  'input:not([disabled]):not([tabindex="-1"]):not([aria-hidden="true"]), ' +
+  'select:not([disabled]):not([tabindex="-1"]):not([aria-hidden="true"]), ' +
+  'textarea:not([disabled]):not([tabindex="-1"]):not([aria-hidden="true"]), ' +
+  '[tabindex]:not([tabindex="-1"]):not([aria-hidden="true"])'
 
 const TYPES = [
   { value: 'bug', label: 'Bug Report', icon: Bug, color: 'text-red-600 bg-red-50 border-red-200' },
@@ -58,32 +66,47 @@ function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; user
   const [error, setError] = useState('')
   const modalRef = useRef<HTMLDivElement>(null)
 
+  // Focus first visible element on mount
   useEffect(() => {
     const el = modalRef.current
     if (!el) return
-
-    const focusable = el.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )
+    const focusable = el.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
     if (focusable.length) focusable[0].focus()
+  }, [])
 
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') { onClose(); return }
-      if (e.key !== 'Tab' || !focusable.length) return
+  // Focus trap — recompute focusable elements on each keydown
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') { onClose(); return }
+    if (e.key !== 'Tab') return
 
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
+    const el = modalRef.current
+    if (!el) return
+    const focusable = el.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+    if (!focusable.length) return
 
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus() }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus() }
-      }
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus() }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus() }
     }
+  }, [onClose])
 
+  useEffect(() => {
+    const el = modalRef.current
+    if (!el) return
     el.addEventListener('keydown', handleKeyDown)
     return () => el.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [handleKeyDown])
+
+  // Revoke blob URL on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (screenshotPreview) URL.revokeObjectURL(screenshotPreview)
+    }
+  }, [screenshotPreview])
 
   function handleScreenshot(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] || null
@@ -106,7 +129,7 @@ function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; user
     setError('')
 
     try {
-      let screenshotUrl: string | null = null
+      let screenshotPath: string | null = null
 
       if (screenshot && userId) {
         setUploading(true)
@@ -120,11 +143,7 @@ function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; user
 
         if (uploadError) throw uploadError
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('feedback-screenshots')
-          .getPublicUrl(filePath)
-
-        screenshotUrl = publicUrl
+        screenshotPath = filePath
         setUploading(false)
       }
 
@@ -132,13 +151,12 @@ function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; user
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: userId ?? null,
           email: email.trim() || null,
           app_slug: appSlug || null,
           type,
           subject: subject.trim() || null,
           body: body.trim(),
-          screenshot: screenshotUrl,
+          screenshot: screenshotPath,
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
           website: honeypot,
         }),
@@ -168,6 +186,7 @@ function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; user
           </h2>
           <button
             onClick={onClose}
+            aria-label="Close feedback dialog"
             className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
           >
             <X size={18} />
@@ -281,6 +300,7 @@ function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; user
                     <button
                       type="button"
                       onClick={removeScreenshot}
+                      aria-label="Remove screenshot"
                       className="absolute -top-2 -right-2 p-1 bg-white rounded-full shadow border border-slate-200 text-slate-400 hover:text-red-500 transition-colors"
                     >
                       <X size={12} />

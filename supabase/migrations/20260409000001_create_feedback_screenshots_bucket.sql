@@ -1,9 +1,9 @@
--- Storage bucket for feedback screenshots
+-- Storage bucket for feedback screenshots (private — use signed URLs to view)
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
   'feedback-screenshots',
   'feedback-screenshots',
-  true,
+  false,
   5242880, -- 5MB limit
   ARRAY['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 )
@@ -18,8 +18,11 @@ WITH CHECK (
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
--- Allow anyone to view feedback screenshots (public bucket)
-DROP POLICY IF EXISTS "Anyone can view feedback screenshots" ON storage.objects;
-CREATE POLICY "Anyone can view feedback screenshots"
+-- Allow authenticated users to view their own screenshots
+DROP POLICY IF EXISTS "Users can view own feedback screenshots" ON storage.objects;
+CREATE POLICY "Users can view own feedback screenshots"
 ON storage.objects FOR SELECT
-USING (bucket_id = 'feedback-screenshots');
+USING (
+  bucket_id = 'feedback-screenshots' AND
+  auth.uid()::text = (storage.foldername(name))[1]
+);

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/utils/supabase/server'
+import { createClient, createServiceClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
 // In-memory rate limiter: 5 submissions per 15 minutes per IP
+// Note: resets on cold starts in serverless environments — acceptable
+// as a best-effort guard, not a security boundary.
 const WINDOW_MS = 15 * 60 * 1000
 const MAX_REQUESTS = 5
 const store = new Map<string, number[]>()
@@ -43,6 +45,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Derive user_id from session instead of trusting client payload
+  const supabaseAuth = await createClient()
+  const { data: { user } } = await supabaseAuth.auth.getUser()
+
   let body: Record<string, unknown>
   try {
     body = await request.json()
@@ -65,7 +71,7 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createServiceClient()
     const { error } = await supabase.from('feedback').insert({
-      user_id: body.user_id || null,
+      user_id: user?.id ?? null,
       email: typeof body.email === 'string' ? body.email.trim() || null : null,
       app_slug: body.app_slug || null,
       type,

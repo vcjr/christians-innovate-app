@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS public.feedback (
   type        TEXT NOT NULL DEFAULT 'bug',
   subject     TEXT,
   body        TEXT NOT NULL,
+  screenshot  TEXT,
   user_agent  TEXT,
   status      TEXT DEFAULT 'new',
   created_at  TIMESTAMPTZ DEFAULT now()
