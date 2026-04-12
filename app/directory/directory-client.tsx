@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe, UserPlus, Clock, Loader2, X, Target } from 'lucide-react'
+import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe, UserPlus, Clock, Loader2, X, Target, MessageSquare } from 'lucide-react'
 import { sendGroupInvitation } from '@/app/accountability/actions'
+import { startConversation } from '@/app/messages/actions'
 
 interface UserProfile {
   id: string
@@ -309,15 +310,26 @@ export function DirectoryClient({ profiles, currentUserId, ownedGroups, membersh
                   )
                 })()}
 
-                {/* Invite to Group Button */}
-                {ownedGroups.length > 0 && profile.user_id !== currentUserId && (
-                  <div className="pt-3 border-t border-gray-100 mt-3">
-                    <button
-                      onClick={() => openModal(profile.user_id, profile.full_name || 'Member')}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
-                    >
-                      <UserPlus className="h-4 w-4" /> Invite to Group
-                    </button>
+                {/* Action Buttons */}
+                {profile.user_id !== currentUserId && (
+                  <div className="pt-3 border-t border-gray-100 mt-3 flex flex-col gap-2">
+                    <form action={startConversation.bind(null, profile.user_id)}>
+                      <button
+                        type="submit"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                      >
+                        <MessageSquare className="h-4 w-4" /> Message
+                      </button>
+                    </form>
+
+                    {ownedGroups.length > 0 && (
+                      <button
+                        onClick={() => openModal(profile.user_id, profile.full_name || 'Member')}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
+                      >
+                        <UserPlus className="h-4 w-4" /> Invite to Group
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
