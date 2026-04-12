@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { LayoutDashboard, Shield, LogOut, Menu, X, Settings, Users, Rocket, FolderOpen, Target } from 'lucide-react'
+import { LayoutDashboard, Shield, LogOut, Menu, X, Settings, Users, Rocket, FolderOpen, Target, MessageSquare } from 'lucide-react'
 import { signOut } from './actions'
 
-export function MobileMenu({ userEmail, isAdmin }: { userEmail: string; isAdmin: boolean }) {
+export function MobileMenu({ userEmail, isAdmin, unreadMessagesCount = 0 }: { userEmail: string; isAdmin: boolean; unreadMessagesCount?: number }) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -82,6 +82,27 @@ export function MobileMenu({ userEmail, isAdmin }: { userEmail: string; isAdmin:
               >
                 <Target className="h-5 w-5" />
                 Accountability
+              </Link>
+
+              <Link
+                href="/messages"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 text-gray-900 hover:text-blue-600 font-medium py-2"
+              >
+                <span className="relative">
+                  <MessageSquare className="h-5 w-5" />
+                  {unreadMessagesCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 text-[9px] font-bold text-white bg-blue-600 rounded-full">
+                      {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                    </span>
+                  )}
+                </span>
+                Messages
+                {unreadMessagesCount > 0 && (
+                  <span className="ml-auto text-xs font-semibold text-blue-600">
+                    {unreadMessagesCount} unread
+                  </span>
+                )}
               </Link>
 
               {isAdmin && (
