@@ -12,6 +12,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Victor Crispin — [@vcjr](https://github.com/vcjr)
+
+**Feedback Widget with Screenshot Upload** — CI-35
+
+A floating feedback button available on every page for authenticated users, enabling bug reports, feature requests, and general feedback — with optional screenshot attachment.
+
+- `FeedbackButton` component rendered globally from root layout (hidden on onboarding/reset-password routes)
+- Modal dialog with three feedback types: Bug Report, Feature Idea, General — each with distinct color-coded selector
+- Screenshot upload to private `feedback-screenshots` Supabase Storage bucket (5 MB limit, JPEG/PNG/GIF/WebP)
+- Blob URL preview with safe validation (`isSafeBlobUrl`) and memory-safe cleanup via `URL.revokeObjectURL` on unmount
+- API route (`/api/feedback`) with in-memory rate limiter (5 submissions per 15 minutes per IP) and `Retry-After` header
+- Honeypot field for bot mitigation — silently accepts submission without storing
+- Server-side `user_id` derivation from session (not trusted from client payload)
+- Uses `createServiceClient()` for insert to bypass RLS write restrictions
+- Email field shown only for unauthenticated users (for follow-up contact)
+- Full keyboard accessibility: focus trap with dynamic focusable element detection, Escape to close
+- Success confirmation state with branded checkmark animation
+- Migration: `feedback` table with RLS (authenticated INSERT + own-record SELECT), status tracking, and admin query indexes
+- Migration: `feedback-screenshots` private storage bucket with folder-scoped RLS (users upload/view only in their own `user_id/` folder)
+
+---
+
+### Summary
+
+| Category          | Details                                                                                                                 |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **New features**  | Global feedback widget with type picker, screenshot upload, success confirmation                                        |
+| **Security**      | Rate limiting (5/15min), honeypot anti-bot, server-side user derivation, blob URL validation, folder-scoped storage RLS |
+| **Accessibility** | Focus trap, Escape dismiss, `aria-modal`, `aria-label`, `role="dialog"`                                                 |
+| **Migrations**    | 2 new migration files (`feedback` table, `feedback-screenshots` bucket)                                                 |
+| **Files changed** | 6 files · +531 lines added · −20 lines removed                                                                          |
+
+
 ---
 
 ## [0.5.0] - 2026-03-27
@@ -44,17 +77,17 @@ The notification bell now updates live without a page reload, and every meaningf
 - `NotificationBell` subscribes to `INSERT` events filtered to the current user via Supabase channel — badge increments instantly when a new notification arrives
 - New notification types added across all accountability actions:
 
-| Type | Trigger | Recipient |
-|---|---|---|
-| `invitation_accepted` | Invitee accepts | Inviter |
-| `invitation_declined` | Invitee declines | Inviter |
-| `join_request` | User requests to join | Group creator |
-| `join_request_approved` | Creator approves | Requester |
-| `join_request_rejected` | Creator rejects | Requester |
-| `member_removed` | Creator removes member | Removed member |
-| `member_left` | Member leaves | Group creator |
-| `ownership_transferred` | Ownership transferred | New owner |
-| `rhythm_updated` | Meeting schedule changed | All other members |
+| Type                    | Trigger                  | Recipient         |
+| ----------------------- | ------------------------ | ----------------- |
+| `invitation_accepted`   | Invitee accepts          | Inviter           |
+| `invitation_declined`   | Invitee declines         | Inviter           |
+| `join_request`          | User requests to join    | Group creator     |
+| `join_request_approved` | Creator approves         | Requester         |
+| `join_request_rejected` | Creator rejects          | Requester         |
+| `member_removed`        | Creator removes member   | Removed member    |
+| `member_left`           | Member leaves            | Group creator     |
+| `ownership_transferred` | Ownership transferred    | New owner         |
+| `rhythm_updated`        | Meeting schedule changed | All other members |
 
 **Bi-Weekly Rhythm: Two Days with Independent Times** — CI-6
 
@@ -130,17 +163,17 @@ Vercel Hobby plan only allows once-daily cron jobs. Changed the scheduler cron f
 
 ### Summary
 
-| Category | Details |
-|---|---|
-| **New features** | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm, transactional email system, broadcast with test send, inbound email inbox, external contacts, password reset flow, auth email templates |
-| **Bug fixes** | Stale column references, modal layout overflow, page width misalignment, admin "Current: Day 1" calculation, welcome email emoji rendering |
-| **Security** | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy, Resend webhook HMAC verification, current-password verification before password change |
-| **Auth** | `/auth/confirm` route handler, forgot-password, reset-password, change password in settings, change email in settings |
-| **Email templates** | 8 branded Supabase auth HTML templates in `supabase/email-templates/` |
-| **Navigation** | Admin + Sign Out moved to profile dropdown; "Forgot password?" link on login |
-| **DevOps** | Vercel cron schedule fixed for Hobby plan |
-| **Migrations** | 16 new migration files |
-| **Files changed** | 50+ files |
+| Category            | Details                                                                                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **New features**    | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm, transactional email system, broadcast with test send, inbound email inbox, external contacts, password reset flow, auth email templates |
+| **Bug fixes**       | Stale column references, modal layout overflow, page width misalignment, admin "Current: Day 1" calculation, welcome email emoji rendering                                                                                                             |
+| **Security**        | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy, Resend webhook HMAC verification, current-password verification before password change                                                          |
+| **Auth**            | `/auth/confirm` route handler, forgot-password, reset-password, change password in settings, change email in settings                                                                                                                                  |
+| **Email templates** | 8 branded Supabase auth HTML templates in `supabase/email-templates/`                                                                                                                                                                                  |
+| **Navigation**      | Admin + Sign Out moved to profile dropdown; "Forgot password?" link on login                                                                                                                                                                           |
+| **DevOps**          | Vercel cron schedule fixed for Hobby plan                                                                                                                                                                                                              |
+| **Migrations**      | 16 new migration files                                                                                                                                                                                                                                 |
+| **Files changed**   | 50+ files                                                                                                                                                                                                                                              |
 
 ---
 
@@ -160,15 +193,15 @@ Complete end-to-end auth email infrastructure that was previously missing, causi
 
 Eight branded HTML email templates in `supabase/email-templates/` for all Supabase Auth flows, matching the platform's visual style (blue gradient bar, logo header, rounded card, branded footer).
 
-| Template | File | Key variable |
-|---|---|---|
-| Confirm sign up | `confirm-signup.html` | `{{ .ConfirmationURL }}` |
-| Invite user | `invite-user.html` | `{{ .ConfirmationURL }}` |
-| Magic link | `magic-link.html` | `{{ .ConfirmationURL }}` |
-| Change email | `change-email.html` | `{{ .ConfirmationURL }}`, `{{ .NewEmail }}` |
-| Reset password | `reset-password.html` | `{{ .ConfirmationURL }}` |
-| Reauthentication | `reauthentication.html` | `{{ .Token }}` (OTP code block) |
-| Password changed | `password-changed.html` | Security notice + amber alert box |
+| Template              | File                         | Key variable                                    |
+| --------------------- | ---------------------------- | ----------------------------------------------- |
+| Confirm sign up       | `confirm-signup.html`        | `{{ .ConfirmationURL }}`                        |
+| Invite user           | `invite-user.html`           | `{{ .ConfirmationURL }}`                        |
+| Magic link            | `magic-link.html`            | `{{ .ConfirmationURL }}`                        |
+| Change email          | `change-email.html`          | `{{ .ConfirmationURL }}`, `{{ .NewEmail }}`     |
+| Reset password        | `reset-password.html`        | `{{ .ConfirmationURL }}`                        |
+| Reauthentication      | `reauthentication.html`      | `{{ .Token }}` (OTP code block)                 |
+| Password changed      | `password-changed.html`      | Security notice + amber alert box               |
 | Email address changed | `email-address-changed.html` | Old → new address detail card + amber alert box |
 
 ---
