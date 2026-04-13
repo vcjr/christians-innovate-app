@@ -12,6 +12,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Victor Crispin — [@vcjr](https://github.com/vcjr)
+
+**In-App Direct Messaging** — CI-36
+
+A full real-time direct messaging system enabling one-on-one conversations between community members, with a LinkedIn-style two-panel layout that adapts responsively for mobile.
+
+- Migrations: `conversations` and `messages` tables with RLS, realtime publication, and indexes for fast lookups
+- Server actions: `getOrCreateConversation`, `startConversation`, `sendMessage`, `markConversationRead`, `loadEarlierMessages`
+- Two-panel layout: `MessagingLayout` (fixed positioning below nav), `ConversationList` sidebar, `MessageThread` main panel
+- Real-time messaging via Supabase `postgres_changes` subscription (INSERT + UPDATE channels)
+- Optimistic message rendering with rollback on failure; real-time handler replaces optimistic entries to prevent duplicates
+- Message button added to every profile card in the Member Directory
+
+**Message Notifications** — CI-36
+
+Messaging integrates with the existing notification system so users are alerted to new messages via the notification bell.
+
+- Migration: `new_message` type added to notifications CHECK constraint
+- `upsert_message_notification()` SECURITY DEFINER function — deduplicates per-conversation, deleting previous unread notification before inserting a fresh one (bypasses RLS for cross-user operations)
+- `dismiss_message_notifications()` SECURITY DEFINER function — clears message notifications when user opens the conversation
+- `sendMessage` action creates/upserts notification for the recipient
+- `markConversationRead` action dismisses notifications for the current user
+
+**Messaging UX Enhancements** — CI-36
+
+Six modern messaging best practices implemented:
+
+| Feature         | Details                                                                                                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auto-link URLs  | `linkifyContent()` regex detects URLs and wraps them in clickable `<a>` tags with `target="_blank" rel="noopener noreferrer"`                                                           |
+| Read receipts   | `Check` (sent) / `CheckCheck` (seen) icons on last own message with "Sent"/"Seen" labels; UPDATE subscription for live status                                                           |
+| Accessibility   | `role="log"`, `aria-live="polite"` on messages container, `aria-label` on textarea and message bubbles                                                                                  |
+| Infinite scroll | "Load earlier messages" button with scroll position preservation; cursor-based `loadEarlierMessages` server action; `PAGE_SIZE = 50`                                                    |
+| Sidebar search  | Filter conversations by name with `useMemo`; visible when >1 conversation                                                                                                               |
+| Performance     | `last_message_preview` and `last_message_sender_id` columns on `conversations` table eliminate expensive all-messages query for sidebar rendering; backfill migration for existing data |
+
+**Navigation Dropdown Grouping** — CI-36
+
+Navbar condensed from 6 top-level items to 4 using dropdown menus, following patterns from Slack, Discord, and LinkedIn.
+
+- New `NavDropdown` client component with click-outside dismiss
+- **Discover** dropdown → Launch & Prayer, Resources
+- **Community** dropdown → Directory, Accountability
+- Dashboard and Messages remain standalone top-level links
+- Mobile menu updated with "Discover" and "Community" section headers (flat links, no dropdowns)
+
+**Directory Card Layout Fix** — CI-36
+
+- Profile cards now use `flex flex-col` with `mt-auto` on the action button container, ensuring Message/Invite buttons always align to the bottom regardless of content height
+
+**Bug Fixes** — CI-36
+
+- Fixed `revalidatePath` called during render in `markConversationRead` — removed since function is called during page render
+- Fixed page scroll when viewing messages — changed `MessagingLayout` from document-flow to `fixed top-16 inset-x-0 bottom-0` positioning
+- Fixed `scrollIntoView` scrolling the outer page — replaced with container-scoped `scrollTop` assignment
+- Fixed conversation list showing "No messages yet" for existing conversations — added backfill query to populate `last_message_preview` from existing messages
+- Added `key={conversationId}` on `MessageThread` to reset component state when switching conversations (avoids stale message display)
+- Added UUID validation on `conversationId` route parameter to prevent invalid database queries
+- Added `maxLength={4000}` on message textarea
+
+---
+
+### Summary
+
+| Category          | Details                                                                                                                                             |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **New features**  | Real-time direct messaging, message notifications with dedup, auto-link URLs, read receipts, infinite scroll, sidebar search, nav dropdown grouping |
+| **Performance**   | Conversation preview columns eliminate N+1 message queries on sidebar                                                                               |
+| **Accessibility** | ARIA roles, live regions, and labels on messaging components                                                                                        |
+| **Security**      | SECURITY DEFINER functions for cross-user notification management, UUID validation, textarea max length                                             |
+| **Navigation**    | 6 nav items → 4 with Discover and Community dropdowns                                                                                               |
+| **Bug fixes**     | Page scroll, render-phase revalidation, optimistic message duplicates, conversation preview backfill                                                |
+| **Migrations**    | 3 new migration files                                                                                                                               |
+| **Files changed** | 18 files · +1 523 lines added · −283 lines removed                                                                                                  |
+
+
 ---
 
 ## [0.5.0] - 2026-03-27
@@ -44,17 +120,17 @@ The notification bell now updates live without a page reload, and every meaningf
 - `NotificationBell` subscribes to `INSERT` events filtered to the current user via Supabase channel — badge increments instantly when a new notification arrives
 - New notification types added across all accountability actions:
 
-| Type | Trigger | Recipient |
-|---|---|---|
-| `invitation_accepted` | Invitee accepts | Inviter |
-| `invitation_declined` | Invitee declines | Inviter |
-| `join_request` | User requests to join | Group creator |
-| `join_request_approved` | Creator approves | Requester |
-| `join_request_rejected` | Creator rejects | Requester |
-| `member_removed` | Creator removes member | Removed member |
-| `member_left` | Member leaves | Group creator |
-| `ownership_transferred` | Ownership transferred | New owner |
-| `rhythm_updated` | Meeting schedule changed | All other members |
+| Type                    | Trigger                  | Recipient         |
+| ----------------------- | ------------------------ | ----------------- |
+| `invitation_accepted`   | Invitee accepts          | Inviter           |
+| `invitation_declined`   | Invitee declines         | Inviter           |
+| `join_request`          | User requests to join    | Group creator     |
+| `join_request_approved` | Creator approves         | Requester         |
+| `join_request_rejected` | Creator rejects          | Requester         |
+| `member_removed`        | Creator removes member   | Removed member    |
+| `member_left`           | Member leaves            | Group creator     |
+| `ownership_transferred` | Ownership transferred    | New owner         |
+| `rhythm_updated`        | Meeting schedule changed | All other members |
 
 **Bi-Weekly Rhythm: Two Days with Independent Times** — CI-6
 
@@ -130,17 +206,17 @@ Vercel Hobby plan only allows once-daily cron jobs. Changed the scheduler cron f
 
 ### Summary
 
-| Category | Details |
-|---|---|
-| **New features** | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm, transactional email system, broadcast with test send, inbound email inbox, external contacts, password reset flow, auth email templates |
-| **Bug fixes** | Stale column references, modal layout overflow, page width misalignment, admin "Current: Day 1" calculation, welcome email emoji rendering |
-| **Security** | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy, Resend webhook HMAC verification, current-password verification before password change |
-| **Auth** | `/auth/confirm` route handler, forgot-password, reset-password, change password in settings, change email in settings |
-| **Email templates** | 8 branded Supabase auth HTML templates in `supabase/email-templates/` |
-| **Navigation** | Admin + Sign Out moved to profile dropdown; "Forgot password?" link on login |
-| **DevOps** | Vercel cron schedule fixed for Hobby plan |
-| **Migrations** | 16 new migration files |
-| **Files changed** | 50+ files |
+| Category            | Details                                                                                                                                                                                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **New features**    | Multi-group membership, group discovery, join request flow, realtime notifications, bi-weekly dual-day rhythm, transactional email system, broadcast with test send, inbound email inbox, external contacts, password reset flow, auth email templates |
+| **Bug fixes**       | Stale column references, modal layout overflow, page width misalignment, admin "Current: Day 1" calculation, welcome email emoji rendering                                                                                                             |
+| **Security**        | Junction-table RLS hardening, `SECURITY DEFINER` `SET search_path`, narrowed invitation UPDATE policy, Resend webhook HMAC verification, current-password verification before password change                                                          |
+| **Auth**            | `/auth/confirm` route handler, forgot-password, reset-password, change password in settings, change email in settings                                                                                                                                  |
+| **Email templates** | 8 branded Supabase auth HTML templates in `supabase/email-templates/`                                                                                                                                                                                  |
+| **Navigation**      | Admin + Sign Out moved to profile dropdown; "Forgot password?" link on login                                                                                                                                                                           |
+| **DevOps**          | Vercel cron schedule fixed for Hobby plan                                                                                                                                                                                                              |
+| **Migrations**      | 16 new migration files                                                                                                                                                                                                                                 |
+| **Files changed**   | 50+ files                                                                                                                                                                                                                                              |
 
 ---
 
@@ -160,15 +236,15 @@ Complete end-to-end auth email infrastructure that was previously missing, causi
 
 Eight branded HTML email templates in `supabase/email-templates/` for all Supabase Auth flows, matching the platform's visual style (blue gradient bar, logo header, rounded card, branded footer).
 
-| Template | File | Key variable |
-|---|---|---|
-| Confirm sign up | `confirm-signup.html` | `{{ .ConfirmationURL }}` |
-| Invite user | `invite-user.html` | `{{ .ConfirmationURL }}` |
-| Magic link | `magic-link.html` | `{{ .ConfirmationURL }}` |
-| Change email | `change-email.html` | `{{ .ConfirmationURL }}`, `{{ .NewEmail }}` |
-| Reset password | `reset-password.html` | `{{ .ConfirmationURL }}` |
-| Reauthentication | `reauthentication.html` | `{{ .Token }}` (OTP code block) |
-| Password changed | `password-changed.html` | Security notice + amber alert box |
+| Template              | File                         | Key variable                                    |
+| --------------------- | ---------------------------- | ----------------------------------------------- |
+| Confirm sign up       | `confirm-signup.html`        | `{{ .ConfirmationURL }}`                        |
+| Invite user           | `invite-user.html`           | `{{ .ConfirmationURL }}`                        |
+| Magic link            | `magic-link.html`            | `{{ .ConfirmationURL }}`                        |
+| Change email          | `change-email.html`          | `{{ .ConfirmationURL }}`, `{{ .NewEmail }}`     |
+| Reset password        | `reset-password.html`        | `{{ .ConfirmationURL }}`                        |
+| Reauthentication      | `reauthentication.html`      | `{{ .Token }}` (OTP code block)                 |
+| Password changed      | `password-changed.html`      | Security notice + amber alert box               |
 | Email address changed | `email-address-changed.html` | Old → new address detail card + amber alert box |
 
 ---
