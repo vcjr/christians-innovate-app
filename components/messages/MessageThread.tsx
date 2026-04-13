@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useTransition } from 'react'
+import { useState, useEffect, useRef, useTransition, useCallback, Fragment } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Send } from 'lucide-react'
+import { ArrowLeft, Send, ChevronUp, Check, CheckCheck } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import { sendMessage } from '@/app/messages/actions'
+import { sendMessage, loadEarlierMessages } from '@/app/messages/actions'
 
 interface Message {
   id: string
@@ -27,6 +27,7 @@ interface MessageThreadProps {
   currentUserId: string
   otherUser: OtherUser
   initialMessages: Message[]
+  hasMore: boolean
 }
 
 function formatMessageTime(dateStr: string): string {
@@ -44,11 +45,45 @@ function formatMessageTime(dateStr: string): string {
     ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+// Auto-link URLs in message content
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g
+
+function linkifyContent(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  const regex = new RegExp(URL_REGEX.source, 'g')
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+    const url = match[0]
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline break-all hover:opacity-80"
+      >
+        {url}
+      </a>
+    )
+    lastIndex = regex.lastIndex
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+  return parts.length > 0 ? parts : text
+}
+
 export function MessageThread({
   conversationId,
   currentUserId,
   otherUser,
   initialMessages,
+  hasMore: initialHasMore,
 }: MessageThreadProps) {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>(initialMessages)
@@ -56,19 +91,20 @@ export function MessageThread({
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  // Keep messages in sync when server re-renders
-  useEffect(() => {
-    setMessages(initialMessages)
-  }, [initialMessages])
+  const [hasMore, setHasMore] = useState(initialHasMore)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesContainerRef.current
+    if (container) {
+      container.scrollTop = container.scrollHeight
+    }
   }, [messages])
 
-  // Real-time subscription for incoming messages
+  // Real-time subscription for incoming messages and read receipts
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
@@ -86,12 +122,42 @@ export function MessageThread({
           setMessages(prev => {
             // Avoid duplicates from optimistic updates
             if (prev.some(m => m.id === incoming.id)) return prev
+            // If this is our own message arriving via realtime, replace the optimistic entry
+            if (incoming.sender_id === currentUserId) {
+              const hasOptimistic = prev.some(m => m.id.startsWith('optimistic-'))
+              if (hasOptimistic) {
+                // Replace the first optimistic message with the real one
+                let replaced = false
+                return prev.map(m => {
+                  if (!replaced && m.id.startsWith('optimistic-')) {
+                    replaced = true
+                    return incoming
+                  }
+                  return m
+                })
+              }
+            }
             return [...prev, incoming]
           })
           // Refresh to update read status server-side
           if (incoming.sender_id !== currentUserId) {
             router.refresh()
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const updated = payload.new as Message
+          setMessages(prev =>
+            prev.map(m => m.id === updated.id ? { ...m, is_read: updated.is_read } : m)
+          )
         }
       )
       .subscribe()
@@ -133,13 +199,42 @@ export function MessageThread({
     }
   }
 
+  const handleLoadEarlier = useCallback(async () => {
+    if (loadingMore || !hasMore || messages.length === 0) return
+    setLoadingMore(true)
+
+    const container = messagesContainerRef.current
+    const scrollHeightBefore = container?.scrollHeight ?? 0
+
+    const oldest = messages[0]
+    const result = await loadEarlierMessages(conversationId, oldest.created_at)
+
+    if (result.messages.length > 0) {
+      setMessages(prev => [...result.messages, ...prev])
+    }
+    setHasMore(result.hasMore)
+    setLoadingMore(false)
+
+    // Preserve scroll position after prepending
+    requestAnimationFrame(() => {
+      if (container) {
+        const scrollHeightAfter = container.scrollHeight
+        container.scrollTop = scrollHeightAfter - scrollHeightBefore
+      }
+    })
+  }, [loadingMore, hasMore, messages, conversationId])
+
+  // Find the last own message for read receipt
+  const lastOwnMessage = [...messages].reverse().find(m => m.sender_id === currentUserId && !m.id.startsWith('optimistic-'))
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+      <div className="flex-shrink-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3">
+        {/* Back arrow — mobile only */}
         <Link
           href="/messages"
-          className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition"
+          className="md:hidden p-1.5 -ml-1 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition"
           aria-label="Back to messages"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -149,28 +244,48 @@ export function MessageThread({
           <Image
             src={otherUser.avatar_url}
             alt={otherUser.full_name || 'User'}
-            width={36}
-            height={36}
-            className="rounded-full object-cover"
+            width={38}
+            height={38}
+            className="w-[38px] h-[38px] rounded-full object-cover aspect-square flex-shrink-0"
           />
         ) : (
-          <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0">
+          <div className="w-[38px] h-[38px] rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-semibold text-sm flex-shrink-0 select-none">
             {(otherUser.full_name || '?').charAt(0).toUpperCase()}
           </div>
         )}
 
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-gray-900 truncate">
+          <p className="font-semibold text-gray-900 text-sm truncate">
             {otherUser.full_name || 'Unknown User'}
           </p>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div
+        ref={messagesContainerRef}
+        role="log"
+        aria-live="polite"
+        aria-label={`Conversation with ${otherUser.full_name || 'user'}`}
+        className="flex-1 overflow-y-auto px-5 py-4 space-y-1.5 bg-gray-50/40"
+      >
+        {/* Load earlier messages */}
+        {hasMore && (
+          <div className="flex justify-center pb-2">
+            <button
+              onClick={handleLoadEarlier}
+              disabled={loadingMore}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-full shadow-sm hover:shadow transition disabled:opacity-50"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+              {loadingMore ? 'Loading…' : 'Load earlier messages'}
+            </button>
+          </div>
+        )}
+
         {messages.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-sm text-gray-400">
+          <div className="flex items-center justify-center h-full">
+            <p className="text-sm text-gray-400 text-center">
               No messages yet. Say hello!
             </p>
           </div>
@@ -178,24 +293,46 @@ export function MessageThread({
 
         {messages.map((msg) => {
           const isOwn = msg.sender_id === currentUserId
+          const isLastOwn = lastOwnMessage?.id === msg.id
           return (
-            <div
-              key={msg.id}
-              className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-            >
+            <Fragment key={msg.id}>
               <div
-                className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm ${
-                  isOwn
-                    ? 'bg-blue-600 text-white rounded-br-sm'
-                    : 'bg-white border border-gray-200 text-gray-900 rounded-bl-sm'
-                }`}
+                className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                role="listitem"
               >
-                <p>{msg.content}</p>
-                <p className={`text-[10px] mt-1 ${isOwn ? 'text-blue-200' : 'text-gray-400'} text-right`}>
-                  {formatMessageTime(msg.created_at)}
-                </p>
+                <div
+                  className={`max-w-[72%] px-3.5 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isOwn
+                    ? 'bg-blue-600 text-white rounded-br-md'
+                    : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md shadow-sm'
+                    }`}
+                >
+                  <p>{linkifyContent(msg.content)}</p>
+                  <p className={`text-[10px] mt-0.5 ${isOwn ? 'text-blue-200' : 'text-gray-400'} text-right`}>
+                    {formatMessageTime(msg.created_at)}
+                  </p>
+                </div>
               </div>
-            </div>
+              {/* Read receipt on last own message */}
+              {isOwn && isLastOwn && (
+                <div className="flex justify-end pr-1">
+                  <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400">
+                    {msg.is_read ? (
+                      <>
+                        <CheckCheck className="h-3 w-3 text-blue-500" />
+                        <span>Seen</span>
+                        <span className="sr-only">Message has been read</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-3 w-3" />
+                        <span>Sent</span>
+                        <span className="sr-only">Message sent, not yet read</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              )}
+            </Fragment>
           )
         })}
 
@@ -204,35 +341,37 @@ export function MessageThread({
 
       {/* Error */}
       {error && (
-        <div className="px-4 py-2 bg-red-50 border-t border-red-100">
+        <div className="flex-shrink-0 px-4 py-2 bg-red-50 border-t border-red-100">
           <p className="text-xs text-red-600">{error}</p>
         </div>
       )}
 
-      {/* Input */}
-      <div className="bg-white border-t border-gray-200 px-4 py-3">
-        <div className="flex items-end gap-2">
+      {/* Compose */}
+      <div className="flex-shrink-0 bg-white px-4 py-3">
+        <div className="flex items-end gap-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-300 transition">
           <textarea
             ref={textareaRef}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
+            placeholder="Write a message…"
+            aria-label={`Message to ${otherUser.full_name || 'user'}`}
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent max-h-32 overflow-y-auto"
-            style={{ minHeight: '42px' }}
+            maxLength={4000}
+            className="flex-1 resize-none bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none max-h-28 overflow-y-auto leading-normal"
+            style={{ minHeight: '24px' }}
           />
           <button
             onClick={handleSend}
             disabled={!draft.trim() || isPending}
-            className="flex-shrink-0 p-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            className="flex-shrink-0 p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
             aria-label="Send message"
           >
             <Send className="h-4 w-4" />
           </button>
         </div>
         <p className="text-[10px] text-gray-400 mt-1.5 ml-1">
-          Press Enter to send · Shift+Enter for a new line
+          Enter to send · Shift+Enter for new line
         </p>
       </div>
     </div>

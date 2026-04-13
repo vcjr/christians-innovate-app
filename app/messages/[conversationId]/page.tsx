@@ -9,6 +9,11 @@ export default async function ConversationPage({
   params: Promise<{ conversationId: string }>
 }) {
   const { conversationId } = await params
+
+  // Validate conversationId is a valid UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!uuidRegex.test(conversationId)) return notFound()
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return redirect('/login')
@@ -39,18 +44,22 @@ export default async function ConversationPage({
     .single()
 
   // Fetch initial messages (most recent 50)
+  const PAGE_SIZE = 50
   const { data: rawMessages } = await supabase
     .from('messages')
     .select('id, sender_id, content, is_read, created_at')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
-    .limit(50)
+    .limit(PAGE_SIZE)
+
+  const initialMessages = rawMessages || []
 
   // Mark incoming messages as read server-side
   await markConversationRead(conversationId)
 
   return (
     <MessageThread
+      key={conversationId}
       conversationId={conversationId}
       currentUserId={user.id}
       otherUser={{
@@ -58,7 +67,8 @@ export default async function ConversationPage({
         full_name: otherProfile?.full_name ?? null,
         avatar_url: otherProfile?.avatar_url ?? null,
       }}
-      initialMessages={rawMessages || []}
+      initialMessages={initialMessages}
+      hasMore={initialMessages.length === PAGE_SIZE}
     />
   )
 }

@@ -82,11 +82,40 @@ export async function sendMessage(conversationId: string, content: string) {
     return { error: msgError.message || 'Failed to send message' }
   }
 
-  // Bump last_message_at on the conversation
+  // Bump last_message_at and store preview on the conversation
+  const messagePreview = trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed
   await supabase
     .from('conversations')
-    .update({ last_message_at: new Date().toISOString() })
+    .update({
+      last_message_at: new Date().toISOString(),
+      last_message_preview: messagePreview,
+      last_message_sender_id: user.id,
+    })
     .eq('id', conversationId)
+
+  // Notify the recipient (one notification per conversation, replace if exists)
+  const recipientId = conversation.participant_1 === user.id
+    ? conversation.participant_2
+    : conversation.participant_1
+
+  // Fetch sender name for the notification title
+  const { data: senderProfile } = await supabase
+    .from('user_profiles')
+    .select('full_name')
+    .eq('user_id', user.id)
+    .single()
+
+  const senderName = senderProfile?.full_name || 'Someone'
+  const preview = trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed
+
+  // Remove any existing + create fresh notification (atomic, bypasses RLS)
+  await supabase.rpc('upsert_message_notification', {
+    p_user_id: recipientId,
+    p_title: `New message from ${senderName}`,
+    p_message: preview,
+    p_link: `/messages/${conversationId}`,
+    p_reference_id: conversationId,
+  })
 
   revalidatePath(`/messages/${conversationId}`)
   return { success: true }
@@ -108,6 +137,45 @@ export async function markConversationRead(conversationId: string) {
     .eq('is_read', false)
     .neq('sender_id', user.id)
 
-  revalidatePath('/messages')
-  revalidatePath(`/messages/${conversationId}`)
+  // Dismiss any new_message notification for this conversation
+  await supabase.rpc('dismiss_message_notifications', {
+    p_conversation_id: conversationId,
+  })
+}
+
+// ============================================================
+// Load earlier messages for infinite scroll (cursor-based)
+// ============================================================
+export async function loadEarlierMessages(conversationId: string, beforeCursor: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { messages: [], hasMore: false }
+
+  // Verify the user is a participant
+  const { data: conversation } = await supabase
+    .from('conversations')
+    .select('id, participant_1, participant_2')
+    .eq('id', conversationId)
+    .single()
+
+  if (!conversation || (conversation.participant_1 !== user.id && conversation.participant_2 !== user.id)) {
+    return { messages: [], hasMore: false }
+  }
+
+  const PAGE_SIZE = 50
+
+  const { data: olderMessages } = await supabase
+    .from('messages')
+    .select('id, sender_id, content, is_read, created_at')
+    .eq('conversation_id', conversationId)
+    .lt('created_at', beforeCursor)
+    .order('created_at', { ascending: false })
+    .limit(PAGE_SIZE)
+
+  const msgs = (olderMessages || []).reverse()
+
+  return {
+    messages: msgs,
+    hasMore: msgs.length === PAGE_SIZE,
+  }
 }
