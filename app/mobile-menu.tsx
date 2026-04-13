@@ -48,6 +48,9 @@ export function MobileMenu({ userEmail, isAdmin, unreadMessagesCount = 0 }: { us
                 Dashboard
               </Link>
 
+              {/* Discover */}
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3">Discover</p>
+
               <Link
                 href="/launch-prayer"
                 onClick={() => setIsOpen(false)}
@@ -58,21 +61,24 @@ export function MobileMenu({ userEmail, isAdmin, unreadMessagesCount = 0 }: { us
               </Link>
 
               <Link
-                href="/directory"
-                onClick={() => setIsOpen(false)}
-                className="flex items-center gap-3 text-gray-900 hover:text-blue-600 font-medium py-2"
-              >
-                <Users className="h-5 w-5" />
-                Directory
-              </Link>
-
-              <Link
                 href="/resources"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center gap-3 text-gray-900 hover:text-blue-600 font-medium py-2"
               >
                 <FolderOpen className="h-5 w-5" />
                 Resources
+              </Link>
+
+              {/* Community */}
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3">Community</p>
+
+              <Link
+                href="/directory"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 text-gray-900 hover:text-blue-600 font-medium py-2"
+              >
+                <Users className="h-5 w-5" />
+                Directory
               </Link>
 
               <Link
