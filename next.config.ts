@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   // TODO: Revisit this once the PWA plugin has native Turbopack support, as this is technical debt.
   turbopack: {},
   images: {
+    unoptimized: process.env.NODE_ENV === 'development', // Disable optimization in development for faster builds
     remotePatterns: [
       {
         protocol: 'https',

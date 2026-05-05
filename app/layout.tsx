@@ -1,11 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { headers } from 'next/headers'
 import { NavigationBar } from './navigation'
 import { BottomNav } from './bottom-nav'
 import { createClient } from '@/utils/supabase/server'
 import { AnnouncementBar } from './announcement-bar'
 import InstallPrompt from '@/components/install-prompt'
+import { NoticeHandler } from '@/components/ui/NoticeHandler'
+
+const CHROME_HIDDEN_ROUTES = ['/reset-password', '/onboarding']
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,6 +57,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headersList = await headers()
+  const pathname = headersList.get('x-pathname') || ''
+  const hideChrome = CHROME_HIDDEN_ROUTES.some(route => pathname.startsWith(route))
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -80,7 +88,7 @@ export default async function RootLayout({
 
   // Fetch active meeting for announcement bar
   let activeMeeting = null
-  if (user) {
+  if (user && !hideChrome) {
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
 
@@ -101,8 +109,9 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <NoticeHandler />
         <NavigationBar />
-        {activeMeeting && user && (
+        {activeMeeting && user && !hideChrome && (
           <AnnouncementBar meeting={activeMeeting} userId={user.id} />
         )}
         <div className="pb-16 md:pb-0">

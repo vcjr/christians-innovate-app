@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { LayoutDashboard, Shield, LogOut, Menu, X, Settings, Users, Rocket } from 'lucide-react'
+import { LayoutDashboard, Shield, LogOut, Menu, X, Settings, Users, Rocket, FolderOpen, Target } from 'lucide-react'
 import { signOut } from './actions'
 
 export function MobileMenu({ userEmail, isAdmin }: { userEmail: string; isAdmin: boolean }) {
@@ -66,9 +66,27 @@ export function MobileMenu({ userEmail, isAdmin }: { userEmail: string; isAdmin:
                 Directory
               </Link>
 
+              <Link
+                href="/resources"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 text-gray-900 hover:text-blue-600 font-medium py-2"
+              >
+                <FolderOpen className="h-5 w-5" />
+                Resources
+              </Link>
+
+              <Link
+                href="/accountability"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-3 text-gray-900 hover:text-blue-600 font-medium py-2"
+              >
+                <Target className="h-5 w-5" />
+                Accountability
+              </Link>
+
               {isAdmin && (
                 <Link
-                  href="/admin/plans"
+                  href="/admin/dashboard"
                   onClick={() => setIsOpen(false)}
                   className="flex items-center gap-3 text-blue-600 hover:text-blue-800 font-medium py-2"
                 >

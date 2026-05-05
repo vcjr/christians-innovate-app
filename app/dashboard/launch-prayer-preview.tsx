@@ -6,31 +6,28 @@ export async function LaunchPrayerPreview() {
   const supabase = await createClient()
 
   // Get counts for each type of active post
-  const { data: launchPosts } = await supabase
+  const { count: launchCount } = await supabase
     .from('launch_prayer_posts')
     .select('id', { count: 'exact', head: true })
     .eq('type', 'launch')
     .eq('is_active', true)
     .eq('is_hidden', false)
 
-  const { data: prayerPosts } = await supabase
+  const { count: prayerCount } = await supabase
     .from('launch_prayer_posts')
     .select('id', { count: 'exact', head: true })
     .eq('type', 'prayer')
     .eq('is_active', true)
     .eq('is_hidden', false)
 
-  const { data: winPosts } = await supabase
+  const { count: winCount } = await supabase
     .from('launch_prayer_posts')
     .select('id', { count: 'exact', head: true })
     .eq('type', 'win')
     .eq('is_active', true)
     .eq('is_hidden', false)
 
-  const launchCount = launchPosts?.length || 0
-  const prayerCount = prayerPosts?.length || 0
-  const winCount = winPosts?.length || 0
-  const totalCount = launchCount + prayerCount + winCount
+  const totalCount = (launchCount || 0) + (prayerCount || 0) + (winCount || 0)
 
   return (
     <Link href="/launch-prayer">
@@ -42,7 +39,7 @@ export async function LaunchPrayerPreview() {
             <div className="flex justify-center mb-2">
               <Rocket className="h-8 w-8 text-blue-600" />
             </div>
-            <p className="text-2xl font-bold text-gray-900">{launchCount}</p>
+            <p className="text-2xl font-bold text-gray-900">{launchCount || 0}</p>
             <p className="text-xs text-gray-600">Launches</p>
           </div>
 
@@ -50,7 +47,7 @@ export async function LaunchPrayerPreview() {
             <div className="flex justify-center mb-2">
               <Heart className="h-8 w-8 text-red-600" />
             </div>
-            <p className="text-2xl font-bold text-gray-900">{prayerCount}</p>
+            <p className="text-2xl font-bold text-gray-900">{prayerCount || 0}</p>
             <p className="text-xs text-gray-600">Prayers</p>
           </div>
 
@@ -58,7 +55,7 @@ export async function LaunchPrayerPreview() {
             <div className="flex justify-center mb-2">
               <Trophy className="h-8 w-8 text-yellow-600" />
             </div>
-            <p className="text-2xl font-bold text-gray-900">{winCount}</p>
+            <p className="text-2xl font-bold text-gray-900">{winCount || 0}</p>
             <p className="text-xs text-gray-600">Wins</p>
           </div>
         </div>

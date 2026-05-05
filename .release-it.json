@@ -1,0 +1,21 @@
+{
+  "$schema": "https://unpkg.com/release-it/schema/release-it.json",
+  "git": {
+    "commitMessage": "chore(release): v${version}",
+    "tagName": "v${version}",
+    "requireCleanWorkingDir": false
+  },
+  "github": {
+    "release": true,
+    "releaseName": "v${version} — Christians Innovate App",
+    "releaseNotes": "scripts/extract-release-notes.sh ${version}"
+  },
+  "npm": {
+    "publish": false
+  },
+  "hooks": {
+    "before:init": "echo '⛪ Preparing release v${version}...'",
+    "after:bump": "echo '📦 Version bumped to ${version}'",
+    "after:release": "echo '🎉 Release v${version} published! Thank you volunteers!'"
+  }
+}

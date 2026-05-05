@@ -51,6 +51,11 @@ Use this prompt as a preamble when asking an AI to help draft Jira tickets for t
 | `post_reactions`      | Emoji reactions on posts (unique per user+post+emoji)                                                                                             |
 | `post_comments`       | Comments on launch/prayer posts                                                                                                                   |
 | `bible_verses`        | Cached bible verse data by translation/book/chapter                                                                                               |
+| `resources`           | Community-shared resources with title, description (markdown), file_url or external_url, category, and is_active/is_hidden flags                  |
+
+**Storage Buckets:**
+- `avatars` - User profile pictures
+- `resources` - Uploaded resource files (PDFs, documents, images, etc.)
 
 ---
 
@@ -85,20 +90,34 @@ Use this prompt as a preamble when asking an AI to help draft Jira tickets for t
 - Admins can **hide** or **delete** any post (moderation).
 - Posts have `is_active` and `is_hidden` flags; hidden/inactive posts show visual indicators.
 
-### 5. Member Directory (`/directory`)
+### 5. Resource Hub (`/resources`)
+- A centralized hub for sharing valuable tools, documents, and links with the community.
+- Stats bar showing total resources, file uploads, and external links counts.
+- **Resource Upload Form**: Allows users to share either a file upload (PDF, DOC, XLS, images, etc. up to 50MB) or an external URL link.
+- **Category selection**: Tools, Documents, Templates, Guides, Books, Videos, Podcasts, Other.
+- **Resource description** supports Markdown formatting rendered with react-markdown.
+- **Resource Cards** display: title, category badge, description preview (line-clamped), author avatar/name, date, and Download/View button.
+- **Client-side filtering**: Search by title/description/author, filter by category, sort by newest/oldest/title.
+- Resource owners can **toggle active/inactive** or **delete** their own resources.
+- Admins can **hide** or **delete** any resource (moderation).
+- Resources have `is_active` and `is_hidden` flags; hidden/inactive resources show visual indicators.
+- **Empty state** with call-to-action to upload the first resource.
+- Files are stored in Supabase Storage `resources` bucket with unique paths (`user_id/timestamp_filename`).
+
+### 6. Member Directory (`/directory`)
 - Grid layout of all member profile cards.
 - Each card shows: avatar (or initials fallback), full name, bio, skills (as tags), interests (as tags), social links (LinkedIn, Facebook, Twitter, Website), and badges for "Looking for Business Partner" / "Looking for Accountability Partner."
 - Expandable skill/interest tag lists (show more/less toggle).
 - Stats header: total members, members seeking business partners, members seeking accountability partners.
 
-### 6. Settings (`/settings`)
+### 7. Settings (`/settings`)
 - **Profile picture** upload (Supabase Storage with upsert).
 - Edit **name**, **bio**, **skills** (tag-based input), **interests** (tag-based input).
 - Toggle **Looking for Business Partner** and **Looking for Accountability Partner** flags.
 - **Social links**: LinkedIn, Facebook, Twitter, Website URLs.
 - Onboarding preferences: CI Updates, Bible in a Year, Skill Share toggles.
 
-### 7. Admin Panel (`/admin/...`)
+### 8. Admin Panel (`/admin/...`)
 Protected by server-side admin role check. Features a blue admin sub-navigation bar with three sections:
 
 - **Reading Plans** (`/admin/plans`): Create new reading plans (title, description). List all plans with click-through to detail.
@@ -106,14 +125,14 @@ Protected by server-side admin role check. Features a blue admin sub-navigation 
 - **Meetings** (`/admin/meetings`): Create meetings (title, description, Zoom link, date, active toggle). List all meetings with attendance counts and an attendees modal showing who joined.
 - **Members** (`/admin/members`): View all members with their profiles and roles. Manage user accounts.
 
-### 8. Announcement Bar
+### 9. Announcement Bar
 - When an admin sets a meeting as `is_active` and its date is in the future, a **blue announcement bar** appears site-wide below the navigation for all authenticated users.
 - Shows meeting title, formatted date/time, description, and a "Join Zoom Meeting" button.
 - Clicking "Join Zoom" opens the link and **tracks attendance** server-side.
 - Dismissible via an X button.
 
-### 9. Navigation
-- **Desktop**: Sticky top nav with logo, links (Dashboard, Launch & Prayer, Directory), admin link (if admin), user profile dropdown with avatar, and sign-out button.
+### 10. Navigation
+- **Desktop**: Sticky top nav with logo, links (Dashboard, Launch & Prayer, Directory, Resources), admin link (if admin), user profile dropdown with avatar, and sign-out button.
 - **Mobile**: Hamburger menu with the same links.
 - User profile dropdown shows avatar (or initials), and the user's name.
 

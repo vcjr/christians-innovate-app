@@ -207,6 +207,7 @@ export default function SignupPage() {
                     name="ci_updates"
                     value="true"
                     className="mt-1"
+                    defaultChecked
                   />
                   <div>
                     <div className="font-medium">CI Updates</div>
@@ -220,6 +221,7 @@ export default function SignupPage() {
                     name="bible_year"
                     value="true"
                     className="mt-1"
+                    defaultChecked
                   />
                   <div>
                     <div className="font-medium">Bible Year</div>
@@ -233,6 +235,7 @@ export default function SignupPage() {
                     name="skill_share"
                     value="true"
                     className="mt-1"
+                    defaultChecked
                   />
                   <div>
                     <div className="font-medium">Skill Share</div>

@@ -213,6 +213,26 @@ CREATE INDEX IF NOT EXISTS idx_day_comments_day_id ON public.day_comments(day_id
 CREATE INDEX IF NOT EXISTS idx_bible_verses_lookup ON public.bible_verses(translation, book, chapter, verse_start, verse_end);
 
 -- ============================================
+-- FUNCTIONS (Required for RLS Policies)
+-- ============================================
+
+-- Function to check if user is admin (bypasses RLS to prevent infinite recursion)
+CREATE OR REPLACE FUNCTION public.is_admin(user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.user_roles 
+    WHERE user_roles.user_id = is_admin.user_id 
+    AND is_admin = true
+  );
+END;
+$$;
+
+-- ============================================
 -- ROW LEVEL SECURITY (RLS)
 -- ============================================
 

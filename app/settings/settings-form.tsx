@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { User as SupabaseUser } from '@supabase/supabase-js'
-import { Camera, Save, Loader2, Download, Trash2, CheckCircle, HardDrive, RefreshCw, LogOut } from 'lucide-react'
+import { Camera, Save, Loader2, Download, Trash2, CheckCircle, HardDrive, RefreshCw, Eye, EyeOff, Check, X } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
@@ -36,6 +36,10 @@ interface Profile {
   facebook_url: string | null
   twitter_url: string | null
   website_url: string | null
+  email_notifications_enabled: boolean
+  daily_reminder_enabled: boolean
+  meeting_reminder_enabled: boolean
+  weekly_digest_enabled: boolean
   created_at: string
   updated_at: string
 }
@@ -60,6 +64,10 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   const [facebookUrl, setFacebookUrl] = useState(profile.facebook_url || '')
   const [twitterUrl, setTwitterUrl] = useState(profile.twitter_url || '')
   const [websiteUrl, setWebsiteUrl] = useState(profile.website_url || '')
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(profile.email_notifications_enabled ?? true)
+  const [dailyReminderEnabled, setDailyReminderEnabled] = useState(profile.daily_reminder_enabled ?? true)
+  const [meetingReminderEnabled, setMeetingReminderEnabled] = useState(profile.meeting_reminder_enabled ?? true)
+  const [weeklyDigestEnabled, setWeeklyDigestEnabled] = useState(profile.weekly_digest_enabled ?? true)
   const [skillInput, setSkillInput] = useState('')
   const [interestInput, setInterestInput] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -76,6 +84,20 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
   } | null>(null)
   const [installPromptDismissed, setInstallPromptDismissed] = useState(false)
   const [daysUntilPrompt, setDaysUntilPrompt] = useState<number | null>(null)
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Email change state
+  const [newEmail, setNewEmail] = useState('')
+  const [changingEmail, setChangingEmail] = useState(false)
+  const [emailMessage, setEmailMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const supabase = createClient()
   const router = useRouter()
@@ -109,48 +131,15 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
     MSG: 'The Message',
   }
 
-  async function handleDownloadTranslation(translation: string) {
-    setDownloadingTranslation(translation)
-    const result = await downloadTranslationForOffline(translation as TranslationKey)
-
-    if (result.success) {
-      const cached = await getCachedTranslations()
-      setCachedTranslations(cached)
-
-      const storage = await getStorageInfo()
-      setStorageInfo(storage)
-
-      setMessage({ type: 'success', text: `${translation} downloaded for offline use` })
-    } else {
-      setMessage({ type: 'error', text: result.error || 'Failed to download translation' })
-    }
-
-    setDownloadingTranslation(null)
+  const passwordRules = {
+    minLength: newPassword.length >= 8,
+    hasUppercase: /[A-Z]/.test(newPassword),
+    hasLowercase: /[a-z]/.test(newPassword),
+    hasNumber: /[0-9]/.test(newPassword),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(newPassword),
   }
-
-  async function handleRemoveTranslation(translation: string) {
-    const result = await removeCachedTranslation(translation as TranslationKey)
-
-    if (result.success) {
-      const cached = await getCachedTranslations()
-      setCachedTranslations(cached)
-
-      const storage = await getStorageInfo()
-      setStorageInfo(storage)
-
-      setMessage({ type: 'success', text: `${translation} removed from offline storage` })
-    } else {
-      setMessage({ type: 'error', text: result.error || 'Failed to remove translation' })
-    }
-  }
-
-  function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
-  }
+  const allPasswordRulesMet = Object.values(passwordRules).every(Boolean)
+  const passwordsMatch = newPassword === confirmNewPassword && confirmNewPassword.length > 0
 
   function getInitials(name: string): string {
     if (!name) return user.email?.[0]?.toUpperCase() || 'U'
@@ -232,6 +221,10 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
           facebook_url: facebookUrl.trim() || null,
           twitter_url: twitterUrl.trim() || null,
           website_url: websiteUrl.trim() || null,
+          email_notifications_enabled: emailNotificationsEnabled,
+          daily_reminder_enabled: dailyReminderEnabled,
+          meeting_reminder_enabled: meetingReminderEnabled,
+          weekly_digest_enabled: weeklyDigestEnabled,
           updated_at: new Date().toISOString()
         })
         .eq('user_id', user.id)
@@ -259,535 +252,751 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
     }
   }
 
-  async function handleSignOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
+  async function handleDownloadTranslation(translation: string) {
+    setDownloadingTranslation(translation)
+    const result = await downloadTranslationForOffline(translation as TranslationKey)
+
+    if (result.success) {
+      const cached = await getCachedTranslations()
+      setCachedTranslations(cached)
+
+      const storage = await getStorageInfo()
+      setStorageInfo(storage)
+
+      setMessage({ type: 'success', text: `${translation} downloaded for offline use` })
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Failed to download translation' })
+    }
+
+    setDownloadingTranslation(null)
+  }
+
+  async function handleRemoveTranslation(translation: string) {
+    const result = await removeCachedTranslation(translation as TranslationKey)
+
+    if (result.success) {
+      const cached = await getCachedTranslations()
+      setCachedTranslations(cached)
+
+      const storage = await getStorageInfo()
+      setStorageInfo(storage)
+
+      setMessage({ type: 'success', text: `${translation} removed from offline storage` })
+    } else {
+      setMessage({ type: 'error', text: result.error || 'Failed to remove translation' })
+    }
+  }
+
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  }
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault()
+    setPasswordMessage(null)
+
+    if (!allPasswordRulesMet) {
+      setPasswordMessage({ type: 'error', text: 'New password does not meet the requirements.' })
+      return
+    }
+    if (!passwordsMatch) {
+      setPasswordMessage({ type: 'error', text: 'New passwords do not match.' })
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      // Verify current password first
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email!,
+        password: currentPassword,
+      })
+      if (signInError) {
+        setPasswordMessage({ type: 'error', text: 'Current password is incorrect.' })
+        return
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) {
+        setPasswordMessage({ type: 'error', text: error.message })
+        return
+      }
+
+      setPasswordMessage({ type: 'success', text: 'Password updated successfully.' })
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+    } catch {
+      setPasswordMessage({ type: 'error', text: 'Something went wrong. Please try again.' })
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  async function handleEmailChange(e: React.FormEvent) {
+    e.preventDefault()
+    setEmailMessage(null)
+
+    if (!newEmail || newEmail === user.email) {
+      setEmailMessage({ type: 'error', text: 'Please enter a different email address.' })
+      return
+    }
+
+    setChangingEmail(true)
+    try {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://app.christiansinnovate.com'
+      const { error } = await supabase.auth.updateUser(
+        { email: newEmail },
+        { emailRedirectTo: `${siteUrl}/auth/confirm?type=email_change` }
+      )
+      if (error) {
+        setEmailMessage({ type: 'error', text: error.message })
+        return
+      }
+      setEmailMessage({
+        type: 'success',
+        text: `Confirmation links sent to both ${user.email} and ${newEmail}. Click the link in each email to complete the change.`,
+      })
+      setNewEmail('')
+    } catch {
+      setEmailMessage({ type: 'error', text: 'Something went wrong. Please try again.' })
+    } finally {
+      setChangingEmail(false)
+    }
   }
 
   return (
-    <>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Avatar Section */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Picture</h2>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Avatar Section */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Picture</h2>
 
-          <div className="flex items-center gap-6">
-            {/* Avatar Display */}
-            <div className="relative">
-              {avatarUrl ? (
-                <Image
-                  src={avatarUrl}
-                  alt="Avatar"
-                  width={96}
-                  height={96}
-                  className="w-24 h-24 rounded-full object-cover border-4 border-gray-100"
-                />
-              ) : (
-                <div className="w-24 h-24 rounded-full bg-blue-500 flex items-center justify-center text-white text-2xl font-semibold border-4 border-gray-100">
-                  {getInitials(fullName)}
-                </div>
-              )}
-            </div>
-
-            {/* Upload Button */}
-            <div>
-              <label
-                htmlFor="avatar-upload"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer font-medium disabled:opacity-50"
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading...
-                  </>
-                ) : (
-                  <>
-                    <Camera className="h-4 w-4" />
-                    Upload Photo
-                  </>
-                )}
-              </label>
-              <input
-                id="avatar-upload"
-                type="file"
-                accept="image/*"
-                onChange={uploadAvatar}
-                disabled={uploading}
-                className="hidden"
+        <div className="flex items-center gap-6">
+          {/* Avatar Display */}
+          <div className="relative">
+            {avatarUrl ? (
+              <Image
+                src={avatarUrl}
+                alt="Avatar"
+                width={96}
+                height={96}
+                className="w-24 h-24 rounded-full object-cover border-4 border-gray-100"
               />
-              <p className="text-xs text-gray-500 mt-2">JPG, PNG or GIF. Max 5MB.</p>
-            </div>
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-blue-500 flex items-center justify-center text-white text-2xl font-semibold border-4 border-gray-100">
+                {getInitials(fullName)}
+              </div>
+            )}
+          </div>
+
+          {/* Upload Button */}
+          <div>
+            <label
+              htmlFor="avatar-upload"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer font-medium disabled:opacity-50"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Camera className="h-4 w-4" />
+                  Upload Photo
+                </>
+              )}
+            </label>
+            <input
+              id="avatar-upload"
+              type="file"
+              accept="image/*"
+              onChange={uploadAvatar}
+              disabled={uploading}
+              className="hidden"
+            />
+            <p className="text-xs text-gray-500 mt-2">JPG, PNG or GIF. Max 5MB.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Profile Information */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Information</h2>
+
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={user.email || ''}
+              disabled
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              To change your email address, use the{' '}
+              <button
+                type="button"
+                onClick={() => document.getElementById('change-email-section')?.scrollIntoView({ behavior: 'smooth' })}
+                className="text-blue-600 hover:underline"
+              >
+                Email Address section
+              </button>{' '}
+              below.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
+              Full Name
+            </label>
+            <input
+              id="fullName"
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Enter your full name"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">
+              Bio
+            </label>
+            <textarea
+              id="bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Tell us about yourself..."
+              rows={4}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
           </div>
         </div>
 
-        {/* Profile Information */}
+        {/* Skills & Interests */}
         <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Information</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Skills & Interests</h2>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Skills */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+              <label htmlFor="skills" className="block text-sm font-medium text-gray-700 mb-1">
+                Skills
               </label>
-              <input
-                id="email"
-                type="email"
-                value={user.email || ''}
-                disabled
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
-              />
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-            </div>
-
-            <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
-              <input
-                id="fullName"
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Enter your full name"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">
-                Bio
-              </label>
-              <textarea
-                id="bio"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Tell us about yourself..."
-                rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              />
-            </div>
-          </div>
-
-          {/* Skills & Interests */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Skills & Interests</h2>
-
-            <div className="space-y-6">
-              {/* Skills */}
-              <div>
-                <label htmlFor="skills" className="block text-sm font-medium text-gray-700 mb-1">
-                  Skills
-                </label>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    id="skills"
-                    type="text"
-                    value={skillInput}
-                    onChange={(e) => setSkillInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        if (skillInput.trim() && !skills.includes(skillInput.trim())) {
-                          setSkills([...skills, skillInput.trim()])
-                          setSkillInput('')
-                        }
-                      }
-                    }}
-                    placeholder="Add a skill and press Enter"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
+              <div className="flex gap-2 mb-2">
+                <input
+                  id="skills"
+                  type="text"
+                  value={skillInput}
+                  onChange={(e) => setSkillInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
                       if (skillInput.trim() && !skills.includes(skillInput.trim())) {
                         setSkills([...skills, skillInput.trim()])
                         setSkillInput('')
                       }
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-                  >
-                    Add
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {skills.map((skill, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-                    >
-                      {skill}
-                      <button
-                        type="button"
-                        onClick={() => setSkills(skills.filter((_, i) => i !== index))}
-                        className="hover:text-blue-900"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
+                    }
+                  }}
+                  placeholder="Add a skill and press Enter"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (skillInput.trim() && !skills.includes(skillInput.trim())) {
+                      setSkills([...skills, skillInput.trim()])
+                      setSkillInput('')
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                >
+                  Add
+                </button>
               </div>
+              <div className="flex flex-wrap gap-2">
+                {skills.map((skill, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                  >
+                    {skill}
+                    <button
+                      type="button"
+                      onClick={() => setSkills(skills.filter((_, i) => i !== index))}
+                      className="hover:text-blue-900"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
 
-              {/* Interests */}
-              <div>
-                <label htmlFor="interests" className="block text-sm font-medium text-gray-700 mb-1">
-                  Interests
-                </label>
-                <div className="flex gap-2 mb-2">
-                  <input
-                    id="interests"
-                    type="text"
-                    value={interestInput}
-                    onChange={(e) => setInterestInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        if (interestInput.trim() && !interests.includes(interestInput.trim())) {
-                          setInterests([...interests, interestInput.trim()])
-                          setInterestInput('')
-                        }
-                      }
-                    }}
-                    placeholder="Add an interest and press Enter"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
+            {/* Interests */}
+            <div>
+              <label htmlFor="interests" className="block text-sm font-medium text-gray-700 mb-1">
+                Interests
+              </label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  id="interests"
+                  type="text"
+                  value={interestInput}
+                  onChange={(e) => setInterestInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
                       if (interestInput.trim() && !interests.includes(interestInput.trim())) {
                         setInterests([...interests, interestInput.trim()])
                         setInterestInput('')
                       }
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-                  >
-                    Add
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {interests.map((interest, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm"
-                    >
-                      {interest}
-                      <button
-                        type="button"
-                        onClick={() => setInterests(interests.filter((_, i) => i !== index))}
-                        className="hover:text-green-900"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Partnership Preferences */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Looking For</h2>
-            <p className="text-sm text-gray-600 mb-4">Let others know what type of partnerships you&apos;re interested in</p>
-
-            <div className="space-y-4">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={lookingForBusinessPartner}
-                  onChange={(e) => setLookingForBusinessPartner(e.target.checked)}
-                  className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Business Partners</p>
-                  <p className="text-sm text-gray-500">I&apos;m open to business collaboration and partnership opportunities</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={lookingForAccountabilityPartner}
-                  onChange={(e) => setLookingForAccountabilityPartner(e.target.checked)}
-                  className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Accountability Partners</p>
-                  <p className="text-sm text-gray-500">I&apos;m looking for someone to help keep me accountable in my faith and goals</p>
-                </div>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Social Media & Website */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Social Media & Website</h2>
-          <p className="text-sm text-gray-600 mb-4">Add your social media profiles and website</p>
-
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="linkedinUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                LinkedIn URL
-              </label>
-              <input
-                id="linkedinUrl"
-                type="url"
-                value={linkedinUrl}
-                onChange={(e) => setLinkedinUrl(e.target.value)}
-                placeholder="https://linkedin.com/in/yourprofile"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="facebookUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                Facebook URL
-              </label>
-              <input
-                id="facebookUrl"
-                type="url"
-                value={facebookUrl}
-                onChange={(e) => setFacebookUrl(e.target.value)}
-                placeholder="https://facebook.com/yourprofile"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="twitterUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                Twitter/X URL
-              </label>
-              <input
-                id="twitterUrl"
-                type="url"
-                value={twitterUrl}
-                onChange={(e) => setTwitterUrl(e.target.value)}
-                placeholder="https://twitter.com/yourhandle"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="websiteUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                Website URL
-              </label>
-              <input
-                id="websiteUrl"
-                type="url"
-                value={websiteUrl}
-                onChange={(e) => setWebsiteUrl(e.target.value)}
-                placeholder="https://yourwebsite.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Offline Downloads Section */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Offline Bible Access</h2>
-            <p className="text-sm text-gray-600 mb-4">Download Bible translations for offline reading</p>
-          </div>
-
-          {/* Storage Info */}
-          {storageInfo && (
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <HardDrive className="h-4 w-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-900">Storage Used</span>
-                </div>
-                <span className="text-sm text-gray-600">
-                  {formatBytes(storageInfo.usage)} of {formatBytes(storageInfo.quota)}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full ${storageInfo.percentUsed > 80 ? 'bg-red-600' : storageInfo.percentUsed > 50 ? 'bg-yellow-600' : 'bg-blue-600'
-                    }`}
-                  style={{ width: `${Math.min(storageInfo.percentUsed, 100)}%` }}
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {storageInfo.percentUsed.toFixed(1)}% used
-              </p>
-            </div>
-          )}
-
-          {/* Translation Downloads */}
-          <div className="space-y-2 mb-4">
-            {Object.entries(BIBLE_TRANSLATIONS).map(([key]) => {
-              const isCached = cachedTranslations.includes(key)
-              const isDownloading = downloadingTranslation === key
-
-              return (
-                <div
-                  key={key}
-                  className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-gray-300 transition"
-                >
-                  <div className="flex items-center gap-3">
-                    {isCached ? (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    ) : (
-                      <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
-                    )}
-                    <div>
-                      <p className="font-medium text-gray-900">{key}</p>
-                      <p className="text-sm text-gray-500">{translationNames[key]}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {isCached ? (
-                      <>
-                        <span className="text-xs text-green-600 font-medium">Downloaded</span>
-                        <button
-                          onClick={() => handleRemoveTranslation(key)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                          title="Remove from offline storage"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => handleDownloadTranslation(key)}
-                        disabled={isDownloading}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                      >
-                        {isDownloading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Downloading...
-                          </>
-                        ) : (
-                          <>
-                            <Download className="h-4 w-4" />
-                            Download
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-900">
-              <strong>Note:</strong> Each translation is approximately 5-6 MB. Downloaded translations will be available for reading even when you&apos;re offline.
-            </p>
-          </div>
-        </div>
-
-        {/* App Installation */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">App Installation</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Install Christians Innovate on your device for a native app experience
-          </p>
-
-          <div className="space-y-4">
-            {installPromptDismissed ? (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <p className="text-sm text-gray-700 mb-3">
-                  You previously dismissed the install prompt.
-                  {daysUntilPrompt !== null && daysUntilPrompt > 0 && (
-                    <span className="text-gray-500">
-                      {' '}It will appear again in {daysUntilPrompt} day{daysUntilPrompt !== 1 ? 's' : ''}.
-                    </span>
-                  )}
-                </p>
-                <button
-                  onClick={() => {
-                    resetInstallPromptDismissal()
-                    setInstallPromptDismissed(false)
-                    setDaysUntilPrompt(null)
-                    setMessage({
-                      type: 'success',
-                      text: 'Install prompt has been reset. Refresh the page to see it again.',
-                    })
+                    }
                   }}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  placeholder="Add an interest and press Enter"
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (interestInput.trim() && !interests.includes(interestInput.trim())) {
+                      setInterests([...interests, interestInput.trim()])
+                      setInterestInput('')
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  Show Install Prompt Again
+                  Add
                 </button>
               </div>
-            ) : (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <p className="text-sm text-green-800">
-                  <strong>Install prompt is enabled.</strong> You&apos;ll see the installation banner when you visit the app.
-                </p>
+              <div className="flex flex-wrap gap-2">
+                {interests.map((interest, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm"
+                  >
+                    {interest}
+                    <button
+                      type="button"
+                      onClick={() => setInterests(interests.filter((_, i) => i !== index))}
+                      className="hover:text-green-900"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Partnership Preferences */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Looking For</h2>
+          <p className="text-sm text-gray-600 mb-4">Let others know what type of partnerships you're interested in</p>
+
+          <div className="space-y-4">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={lookingForBusinessPartner}
+                onChange={(e) => setLookingForBusinessPartner(e.target.checked)}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Business Partners</p>
+                <p className="text-sm text-gray-500">I'm open to business collaboration and partnership opportunities</p>
+              </div>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={lookingForAccountabilityPartner}
+                onChange={(e) => setLookingForAccountabilityPartner(e.target.checked)}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Accountability Partners</p>
+                <p className="text-sm text-gray-500">I'm looking for someone to help keep me accountable in my faith and goals</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Social Media & Website */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Social Media & Website</h2>
+        <p className="text-sm text-gray-600 mb-4">Add your social media profiles and website</p>
+
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="linkedinUrl" className="block text-sm font-medium text-gray-700 mb-1">
+              LinkedIn URL
+            </label>
+            <input
+              id="linkedinUrl"
+              type="url"
+              value={linkedinUrl}
+              onChange={(e) => setLinkedinUrl(e.target.value)}
+              placeholder="https://linkedin.com/in/yourprofile"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="facebookUrl" className="block text-sm font-medium text-gray-700 mb-1">
+              Facebook URL
+            </label>
+            <input
+              id="facebookUrl"
+              type="url"
+              value={facebookUrl}
+              onChange={(e) => setFacebookUrl(e.target.value)}
+              placeholder="https://facebook.com/yourprofile"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="twitterUrl" className="block text-sm font-medium text-gray-700 mb-1">
+              Twitter/X URL
+            </label>
+            <input
+              id="twitterUrl"
+              type="url"
+              value={twitterUrl}
+              onChange={(e) => setTwitterUrl(e.target.value)}
+              placeholder="https://twitter.com/yourhandle"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="websiteUrl" className="block text-sm font-medium text-gray-700 mb-1">
+              Website URL
+            </label>
+            <input
+              id="websiteUrl"
+              type="url"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              placeholder="https://yourwebsite.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Email Notifications */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Email Notifications</h2>
+        <p className="text-sm text-gray-600 mb-4">Manage your email notification preferences</p>
+
+        <div className="space-y-4">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={emailNotificationsEnabled}
+              onChange={(e) => {
+                const enabled = e.target.checked
+                setEmailNotificationsEnabled(enabled)
+                // If turning off master switch, disable all sub-options
+                if (!enabled) {
+                  setDailyReminderEnabled(false)
+                  setMeetingReminderEnabled(false)
+                  setWeeklyDigestEnabled(false)
+                }
+              }}
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <p className="font-semibold text-gray-900 group-hover:text-blue-600 transition">Enable Email Notifications</p>
+              <p className="text-sm text-gray-500">Master toggle for all email notifications from Christians Innovate</p>
+            </div>
+          </label>
+
+          <div className={`ml-7 pl-4 border-l-2 ${emailNotificationsEnabled ? 'border-blue-500' : 'border-gray-300 opacity-50'} space-y-4`}>
+            <label className={`flex items-start gap-3 ${emailNotificationsEnabled ? 'cursor-pointer' : 'cursor-not-allowed'} group`}>
+              <input
+                type="checkbox"
+                checked={dailyReminderEnabled && emailNotificationsEnabled}
+                onChange={(e) => setDailyReminderEnabled(e.target.checked)}
+                disabled={!emailNotificationsEnabled}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Daily Reading Reminders</p>
+                <p className="text-sm text-gray-500">Get daily reminders for your Bible reading plan (sent at 8am UTC)</p>
+              </div>
+            </label>
+
+            <label className={`flex items-start gap-3 ${emailNotificationsEnabled ? 'cursor-pointer' : 'cursor-not-allowed'} group`}>
+              <input
+                type="checkbox"
+                checked={meetingReminderEnabled && emailNotificationsEnabled}
+                onChange={(e) => setMeetingReminderEnabled(e.target.checked)}
+                disabled={!emailNotificationsEnabled}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Meeting Reminders</p>
+                <p className="text-sm text-gray-500">Receive reminders about upcoming community meetings (sent day before)</p>
+              </div>
+            </label>
+
+            <label className={`flex items-start gap-3 ${emailNotificationsEnabled ? 'cursor-pointer' : 'cursor-not-allowed'} group`}>
+              <input
+                type="checkbox"
+                checked={weeklyDigestEnabled && emailNotificationsEnabled}
+                onChange={(e) => setWeeklyDigestEnabled(e.target.checked)}
+                disabled={!emailNotificationsEnabled}
+                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Weekly Digest</p>
+                <p className="text-sm text-gray-500">Weekly summary of community activity and upcoming events (sent Mondays)</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Newsletter Preferences */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Newsletter Preferences</h2>
+        <p className="text-sm text-gray-600 mb-4">Choose which updates you'd like to receive from us</p>
+
+        <div className="space-y-4">
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={ciUpdates}
+              onChange={(e) => setCiUpdates(e.target.checked)}
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">CI Updates</p>
+              <p className="text-sm text-gray-500">Receive updates about Christians Innovate community and events</p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={bibleYear}
+              onChange={(e) => setBibleYear(e.target.checked)}
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Bible in a Year</p>
+              <p className="text-sm text-gray-500">Get reminders and updates for Bible reading plans</p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={skillShare}
+              onChange={(e) => setSkillShare(e.target.checked)}
+              className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Skill Share</p>
+              <p className="text-sm text-gray-500">Receive notifications about skill-sharing opportunities and workshops</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Change Password */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Change Password</h2>
+        <p className="text-sm text-gray-600 mb-4">Update the password for your Christians Innovate account.</p>
+
+        <form onSubmit={handlePasswordChange} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+            <div className="relative">
+              <input
+                type={showCurrentPassword ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter your current password"
+                className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+            <div className="relative">
+              <input
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Create a new password"
+                className="w-full px-4 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            {newPassword.length > 0 && (
+              <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-1">
+                {([
+                  [passwordRules.minLength, 'At least 8 characters'],
+                  [passwordRules.hasUppercase, 'One uppercase letter'],
+                  [passwordRules.hasLowercase, 'One lowercase letter'],
+                  [passwordRules.hasNumber, 'One number'],
+                  [passwordRules.hasSpecial, 'One special character'],
+                ] as [boolean, string][]).map(([met, label]) => (
+                  <div key={label} className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-gray-500'}`}>
+                    {met ? <Check className="h-3 w-3 shrink-0" /> : <X className="h-3 w-3 shrink-0" />}
+                    {label}
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        </div>
 
-        {/* Newsletter Preferences */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Newsletter Preferences</h2>
-          <p className="text-sm text-gray-600 mb-4">Choose which updates you&apos;d like to receive from us</p>
-
-          <div className="space-y-4">
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={ciUpdates}
-                onChange={(e) => setCiUpdates(e.target.checked)}
-                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <div className="flex-1">
-                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">CI Updates</p>
-                <p className="text-sm text-gray-500">Receive updates about Christians Innovate community and events</p>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={bibleYear}
-                onChange={(e) => setBibleYear(e.target.checked)}
-                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <div className="flex-1">
-                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Bible in a Year</p>
-                <p className="text-sm text-gray-500">Get reminders and updates for Bible reading plans</p>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={skillShare}
-                onChange={(e) => setSkillShare(e.target.checked)}
-                className="mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <div className="flex-1">
-                <p className="font-medium text-gray-900 group-hover:text-blue-600 transition">Skill Share</p>
-                <p className="text-sm text-gray-500">Receive notifications about skill-sharing opportunities and workshops</p>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        {/* Message */}
-        {message && (
-          <div
-            className={`p-4 rounded-lg ${message.type === 'success'
-              ? 'bg-green-50 text-green-800 border border-green-200'
-              : 'bg-red-50 text-red-800 border border-red-200'
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
+            <input
+              type="password"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              placeholder="Re-enter your new password"
+              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:border-transparent ${
+                confirmNewPassword.length > 0
+                  ? passwordsMatch
+                    ? 'border-green-400 focus:ring-green-500'
+                    : 'border-red-400 focus:ring-red-500'
+                  : 'border-gray-300 focus:ring-blue-500'
               }`}
-          >
-            {message.text}
+              required
+            />
+            {confirmNewPassword.length > 0 && !passwordsMatch && (
+              <p className="text-xs text-red-600 mt-1">Passwords do not match.</p>
+            )}
+          </div>
+
+          {passwordMessage && (
+            <div className={`p-3 rounded-lg text-sm ${passwordMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+              {passwordMessage.text}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={changingPassword || !currentPassword || !allPasswordRulesMet || !passwordsMatch}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+            >
+              {changingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+              Update Password
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Change Email */}
+      <div id="change-email-section" className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Email Address</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Update the email address associated with your account. We'll send a confirmation link to the new address before making the change.
+        </p>
+
+        <form onSubmit={handleEmailChange} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Current email</label>
+            <input
+              type="email"
+              value={user.email || ''}
+              disabled
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">New email address</label>
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="your-new@email.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+            />
+          </div>
+
+          {emailMessage && (
+            <div className={`p-3 rounded-lg text-sm ${emailMessage.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+              {emailMessage.text}
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={changingEmail || !newEmail}
+              className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 text-sm"
+            >
+              {changingEmail && <Loader2 className="h-4 w-4 animate-spin" />}
+              Send Confirmation
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Offline Bible Reading */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Offline Bible Reading</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Download Bible translations to read offline when you don&apos;t have an internet connection
+        </p>
+
+        {storageInfo && (
+          <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <HardDrive className="h-4 w-4 text-gray-600" />
+              <span className="text-sm font-medium text-gray-700">Storage Used</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-1">
+              <div
+                className="bg-blue-600 h-2 rounded-full"
+                style={{ width: `${Math.min(storageInfo.percentUsed, 100)}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              {formatBytes(storageInfo.usage)} of {formatBytes(storageInfo.quota)} used ({Math.round(storageInfo.percentUsed)}%)
+            </p>
           </div>
         )}
 
-        {/* Translation Downloads */}
         <div className="space-y-2 mb-4">
           {Object.entries(BIBLE_TRANSLATIONS).map(([key]) => {
             const isCached = cachedTranslations.includes(key)
@@ -818,6 +1027,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
                     <>
                       <span className="text-xs text-green-600 font-medium">Downloaded</span>
                       <button
+                        type="button"
                         onClick={() => handleRemoveTranslation(key)}
                         className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
                         title="Remove from offline storage"
@@ -827,6 +1037,7 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
                     </>
                   ) : (
                     <button
+                      type="button"
                       onClick={() => handleDownloadTranslation(key)}
                       disabled={isDownloading}
                       className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
@@ -851,12 +1062,90 @@ export function SettingsForm({ user, profile }: SettingsFormProps) {
           })}
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-900">
-            <strong>Note:</strong> Each translation is approximately {TRANSLATION_FILE_SIZE}. Downloads may take 15-60 seconds on slower connections. Downloaded translations will be available for reading even when you&apos;re offline.
+            <strong>Note:</strong> Each translation is approximately {TRANSLATION_FILE_SIZE}. Downloads may take 15-60 seconds on slower connections.
           </p>
         </div>
-      </form>
-    </>
+      </div>
+
+      {/* App Installation */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">App Installation</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Install Christians Innovate on your device for a native app experience
+        </p>
+
+        <div className="space-y-4">
+          {installPromptDismissed ? (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm text-gray-700 mb-3">
+                You previously dismissed the install prompt.
+                {daysUntilPrompt !== null && daysUntilPrompt > 0 && (
+                  <span className="text-gray-500">
+                    {' '}It will appear again in {daysUntilPrompt} day{daysUntilPrompt !== 1 ? 's' : ''}.
+                  </span>
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  resetInstallPromptDismissal()
+                  setInstallPromptDismissed(false)
+                  setDaysUntilPrompt(null)
+                  setMessage({
+                    type: 'success',
+                    text: 'Install prompt has been reset. Refresh the page to see it again.',
+                  })
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Show Install Prompt Again
+              </button>
+            </div>
+          ) : (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <p className="text-sm text-green-800">
+                <strong>Install prompt is enabled.</strong> You&apos;ll see the installation banner when you visit the app.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Message */}
+      {message && (
+        <div
+          className={`p-4 rounded-lg ${message.type === 'success'
+            ? 'bg-green-50 text-green-800 border border-green-200'
+            : 'bg-red-50 text-red-800 border border-red-200'
+            }`}
+        >
+          {message.text}
+        </div>
+      )}
+
+      {/* Save Button */}
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={saving}
+          className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+        >
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4" />
+              Save Changes
+            </>
+          )}
+        </button>
+      </div>
+    </form>
   )
 }
