@@ -38,8 +38,11 @@ export async function fetchBibleVersesIndividually(
 ): Promise<{ verses: IndividualVerse[]; reference: string } | null> {
   const translationCode = BIBLE_TRANSLATIONS[translation]
 
+  // Expand compound forms like "2 & 3 John" → "2 John, 3 John" before splitting
+  const expanded = expandCompoundReference(reference)
+
   // Split by commas to handle multiple references
-  const references = reference.split(',').map(ref => ref.trim()).filter(ref => ref.length > 0)
+  const references = expanded.split(',').map(ref => ref.trim()).filter(ref => ref.length > 0)
 
   console.log('Processing references:', references)
 
@@ -180,6 +183,79 @@ async function fetchSingleReference(
   }
 }
 
+// Common book name abbreviations to full canonical names (as stored in DB)
+const BOOK_NAME_EXPANSIONS: Record<string, string> = {
+  'Gen': 'Genesis',
+  'Ex': 'Exodus', 'Exod': 'Exodus',
+  'Lev': 'Leviticus',
+  'Num': 'Numbers',
+  'Deut': 'Deuteronomy', 'Deu': 'Deuteronomy',
+  'Josh': 'Joshua', 'Jos': 'Joshua',
+  'Judg': 'Judges', 'Jdg': 'Judges',
+  'Sam': 'Samuel',
+  '1 Sam': '1 Samuel', '2 Sam': '2 Samuel',
+  '1 Kgs': '1 Kings', '2 Kgs': '2 Kings',
+  '1 Chr': '1 Chronicles', '2 Chr': '2 Chronicles',
+  'Neh': 'Nehemiah',
+  'Est': 'Esther', 'Esth': 'Esther',
+  'Ps': 'Psalms', 'Psalm': 'Psalms',
+  'Prov': 'Proverbs', 'Pro': 'Proverbs',
+  'Eccl': 'Ecclesiastes', 'Ecc': 'Ecclesiastes',
+  'Song': 'Song of Solomon', 'SOS': 'Song of Solomon',
+  'Isa': 'Isaiah',
+  'Jer': 'Jeremiah',
+  'Lam': 'Lamentations',
+  'Ezek': 'Ezekiel', 'Eze': 'Ezekiel',
+  'Dan': 'Daniel',
+  'Hos': 'Hosea',
+  'Obad': 'Obadiah',
+  'Mic': 'Micah',
+  'Nah': 'Nahum',
+  'Hab': 'Habakkuk',
+  'Zeph': 'Zephaniah', 'Zep': 'Zephaniah',
+  'Hag': 'Haggai',
+  'Zech': 'Zechariah', 'Zec': 'Zechariah',
+  'Mal': 'Malachi',
+  'Matt': 'Matthew', 'Mat': 'Matthew',
+  'Rom': 'Romans',
+  '1 Cor': '1 Corinthians', '2 Cor': '2 Corinthians',
+  'Gal': 'Galatians',
+  'Eph': 'Ephesians',
+  'Phil': 'Philippians', 'Php': 'Philippians',
+  'Col': 'Colossians',
+  '1 Thess': '1 Thessalonians', '2 Thess': '2 Thessalonians',
+  '1 Thes': '1 Thessalonians', '2 Thes': '2 Thessalonians',
+  '1 Tim': '1 Timothy', '2 Tim': '2 Timothy',
+  'Phlm': 'Philemon', 'Phm': 'Philemon',
+  'Heb': 'Hebrews',
+  'Jas': 'James',
+  '1 Pet': '1 Peter', '2 Pet': '2 Peter',
+  '1 Jn': '1 John', '2 Jn': '2 John', '3 Jn': '3 John',
+  'Rev': 'Revelation', 'Apoc': 'Revelation',
+}
+
+// Single-chapter books that may appear with no chapter number
+const SINGLE_CHAPTER_BOOKS = new Set([
+  'Obadiah', 'Philemon', '2 John', '3 John', 'Jude',
+])
+
+function normalizeBookName(raw: string): string {
+  const trimmed = raw.trim()
+  return BOOK_NAME_EXPANSIONS[trimmed] ?? trimmed
+}
+
+/**
+ * Pre-process a scripture reference string, expanding compound "&" forms like
+ * "2 & 3 John" into comma-separated individual references "2 John, 3 John".
+ */
+function expandCompoundReference(reference: string): string {
+  // Match patterns like "2 & 3 John" → "2 John, 3 John"
+  return reference.replace(
+    /(\d+)\s*&\s*(\d+)\s+([A-Za-z]+(?:\s+[A-Za-z]+)*)/g,
+    (_, n1, n2, bookName) => `${n1} ${bookName}, ${n2} ${bookName}`
+  )
+}
+
 /**
  * Parse a scripture reference to extract book, chapter, and verses
  */
@@ -200,7 +276,7 @@ export function parseScriptureReference(reference: string): {
     const [, book, chapter, verseStart, verseEnd] = match
 
     return {
-      book: book.trim(),
+      book: normalizeBookName(book),
       chapter: parseInt(chapter),
       verseStart: parseInt(verseStart),
       verseEnd: verseEnd ? parseInt(verseEnd) : null,
@@ -214,7 +290,7 @@ export function parseScriptureReference(reference: string): {
     const [, book, chapterStart, chapterEnd] = match
 
     return {
-      book: book.trim(),
+      book: normalizeBookName(book),
       chapter: parseInt(chapterStart),
       chapterEnd: parseInt(chapterEnd),
       verseStart: null,
@@ -229,10 +305,25 @@ export function parseScriptureReference(reference: string): {
     const [, book, chapter] = match
 
     return {
-      book: book.trim(),
+      book: normalizeBookName(book),
       chapter: parseInt(chapter),
       verseStart: null,
       verseEnd: null,
+    }
+  }
+
+  // Try to parse a single-chapter book with no chapter number: "Jude", "Philemon"
+  match = normalizedRef.match(/^([A-Za-z0-9\s]+)$/)
+
+  if (match) {
+    const book = normalizeBookName(match[1])
+    if (SINGLE_CHAPTER_BOOKS.has(book)) {
+      return {
+        book,
+        chapter: 1,
+        verseStart: null,
+        verseEnd: null,
+      }
     }
   }
 

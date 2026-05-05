@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Victor Crispin — [@vcjr](https://github.com/vcjr)
+
+**Bible Reading Plan — Scripture Reference Parsing Fixes**
+
+Fixed three parsing gaps in `utils/bible-api.ts` that prevented certain reading plan entries from loading verses:
+
+- **Abbreviations**: added `BOOK_NAME_EXPANSIONS` map so shorthand book names (`2 Cor`, `1 Thess`, `2 Thess`, `1 Cor`, etc.) expand to the canonical full names stored in the database before the Supabase query runs
+- **Single-chapter books**: added a fourth parse pattern to handle bare book names with no chapter number (`Jude`, `Philemon`), defaulting to chapter 1
+- **Compound `&` references**: added `expandCompoundReference()` to rewrite entries like `2 & 3 John` into `2 John, 3 John` before the comma-split, so both books are fetched correctly
+
 ---
 
 ## [0.5.0] - 2026-03-27
