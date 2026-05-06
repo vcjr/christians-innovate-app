@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe, UserPlus, Clock, Loader2, X, Target, MessageSquare } from 'lucide-react'
 import { sendGroupInvitation } from '@/app/accountability/actions'
-import { startConversation } from '@/app/messages/actions'
+import { sendMessageRequest, navigateToConversation } from '@/app/messages/actions'
 
 interface UserProfile {
   id: string
@@ -34,6 +34,7 @@ interface DirectoryClientProps {
   ownedGroups: OwnedGroup[]
   membershipByGroup: Record<string, string[]>
   pendingByGroup: Record<string, string[]>
+  conversationByUserId: Record<string, { id: string; status: string; requestedBy: string | null }>
 }
 
 function getInitials(name: string | null): string {
@@ -45,7 +46,7 @@ function getInitials(name: string | null): string {
   return name.substring(0, 2).toUpperCase()
 }
 
-export function DirectoryClient({ profiles, currentUserId, ownedGroups, membershipByGroup, pendingByGroup }: DirectoryClientProps) {
+export function DirectoryClient({ profiles, currentUserId, ownedGroups, membershipByGroup, pendingByGroup, conversationByUserId }: DirectoryClientProps) {
   const router = useRouter()
   const [expandedSkills, setExpandedSkills] = useState<Set<string>>(new Set())
   const [expandedInterests, setExpandedInterests] = useState<Set<string>>(new Set())
@@ -313,14 +314,58 @@ export function DirectoryClient({ profiles, currentUserId, ownedGroups, membersh
                   {/* Action Buttons */}
                   {profile.user_id !== currentUserId && (
                     <div className="pt-3 border-t border-gray-100 mt-auto flex flex-col gap-2">
-                      <form action={startConversation.bind(null, profile.user_id)}>
-                        <button
-                          type="submit"
-                          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
-                        >
-                          <MessageSquare className="h-4 w-4" /> Message
-                        </button>
-                      </form>
+                      {(() => {
+                        const conv = conversationByUserId[profile.user_id]
+
+                        if (!conv) {
+                          return (
+                            <form action={sendMessageRequest.bind(null, profile.user_id)}>
+                              <button
+                                type="submit"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                              >
+                                <MessageSquare className="h-4 w-4" /> Connect
+                              </button>
+                            </form>
+                          )
+                        }
+
+                        if (conv.status === 'accepted') {
+                          return (
+                            <form action={navigateToConversation.bind(null, conv.id)}>
+                              <button
+                                type="submit"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+                              >
+                                <MessageSquare className="h-4 w-4" /> Message
+                              </button>
+                            </form>
+                          )
+                        }
+
+                        // status === 'pending'
+                        if (conv.requestedBy === currentUserId) {
+                          return (
+                            <button
+                              disabled
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-400 rounded-lg text-sm font-medium cursor-not-allowed"
+                            >
+                              <MessageSquare className="h-4 w-4" /> Request Sent
+                            </button>
+                          )
+                        }
+
+                        return (
+                          <form action={navigateToConversation.bind(null, conv.id)}>
+                            <button
+                              type="submit"
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition"
+                            >
+                              <MessageSquare className="h-4 w-4" /> Accept Request
+                            </button>
+                          </form>
+                        )
+                      })()}
 
                       {ownedGroups.length > 0 && (
                         <button
