@@ -12,12 +12,17 @@ async function findConversation(userId1: string, userId2: string) {
   const supabase = await createClient()
   const [p1, p2] = [userId1, userId2].sort()
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('conversations')
     .select('id, status')
     .eq('participant_1', p1)
     .eq('participant_2', p2)
     .single()
+
+  if (error && error.code !== 'PGRST116') {
+    // PGRST116 = "no rows found" which is expected; anything else is a real DB error
+    throw new Error(error.message)
+  }
 
   return data ?? null
 }
@@ -83,6 +88,8 @@ export async function navigateToConversation(conversationId: string) {
 // ============================================================
 export async function acceptMessageRequest(conversationId: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
 
   const { error } = await supabase.rpc('accept_message_request', {
     p_conversation_id: conversationId,
@@ -104,6 +111,8 @@ export async function acceptMessageRequest(conversationId: string) {
 // ============================================================
 export async function declineMessageRequest(conversationId: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return redirect('/login')
 
   const { error } = await supabase.rpc('decline_message_request', {
     p_conversation_id: conversationId,
@@ -153,12 +162,12 @@ export async function sendMessage(conversationId: string, content: string) {
     return { error: msgError.message || 'Failed to send message' }
   }
 
-  const messagePreview = trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed
+  const preview = trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed
   await supabase
     .from('conversations')
     .update({
       last_message_at: new Date().toISOString(),
-      last_message_preview: messagePreview,
+      last_message_preview: preview,
       last_message_sender_id: user.id,
     })
     .eq('id', conversationId)
@@ -174,7 +183,6 @@ export async function sendMessage(conversationId: string, content: string) {
     .single()
 
   const senderName = senderProfile?.full_name || 'Someone'
-  const preview = trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed
 
   await supabase.rpc('upsert_message_notification', {
     p_user_id: recipientId,
@@ -196,16 +204,18 @@ export async function markConversationRead(conversationId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  await supabase
+  const { error: readError } = await supabase
     .from('messages')
     .update({ is_read: true })
     .eq('conversation_id', conversationId)
     .eq('is_read', false)
     .neq('sender_id', user.id)
+  if (readError) console.error('markConversationRead: failed to mark messages read', readError)
 
-  await supabase.rpc('dismiss_message_notifications', {
+  const { error: dismissError } = await supabase.rpc('dismiss_message_notifications', {
     p_conversation_id: conversationId,
   })
+  if (dismissError) console.error('markConversationRead: failed to dismiss notifications', dismissError)
 }
 
 // ============================================================
