@@ -5,53 +5,120 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 
 // ============================================================
-// Helper: get or create a conversation between two users.
-// Normalises the pair so participant_1 is always the
-// lexicographically-smaller UUID, enforcing the UNIQUE constraint.
+// Helper: find an existing conversation between two users.
+// Returns { id, status } or null if none exists.
 // ============================================================
-async function getOrCreateConversation(currentUserId: string, otherUserId: string) {
+async function findConversation(userId1: string, userId2: string) {
   const supabase = await createClient()
+  const [p1, p2] = [userId1, userId2].sort()
 
-  const [p1, p2] = [currentUserId, otherUserId].sort()
-
-  // Try to find an existing conversation
-  const { data: existing } = await supabase
+  const { data } = await supabase
     .from('conversations')
-    .select('id')
+    .select('id, status')
     .eq('participant_1', p1)
     .eq('participant_2', p2)
     .single()
 
-  if (existing) return existing.id
-
-  // Create a new one
-  const { data: created, error } = await supabase
-    .from('conversations')
-    .insert({ participant_1: p1, participant_2: p2 })
-    .select('id')
-    .single()
-
-  if (error || !created) {
-    throw new Error(error?.message || 'Failed to create conversation')
-  }
-
-  return created.id
+  return data ?? null
 }
 
 // ============================================================
-// Start or navigate to a DM with another user
+// Send a message request to another user.
+// Creates a pending conversation and notifies the recipient.
+// If a conversation already exists (any status), navigates to it.
 // ============================================================
-export async function startConversation(otherUserId: string) {
+export async function sendMessageRequest(otherUserId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return redirect('/login')
 
-  const conversationId = await getOrCreateConversation(user.id, otherUserId)
+  const existing = await findConversation(user.id, otherUserId)
+  if (existing) {
+    redirect(`/messages/${existing.id}`)
+  }
+
+  const [p1, p2] = [user.id, otherUserId].sort()
+
+  const { data: conv, error } = await supabase
+    .from('conversations')
+    .insert({ participant_1: p1, participant_2: p2, status: 'pending', requested_by: user.id })
+    .select('id')
+    .single()
+
+  if (error || !conv) {
+    throw new Error(error?.message || 'Failed to create conversation')
+  }
+
+  // Fetch sender name for the notification
+  const { data: senderProfile } = await supabase
+    .from('user_profiles')
+    .select('full_name')
+    .eq('user_id', user.id)
+    .single()
+
+  const senderName = senderProfile?.full_name || 'Someone'
+
+  await supabase.rpc('create_notification_for_user', {
+    p_user_id: otherUserId,
+    p_type: 'message_request',
+    p_title: `${senderName} wants to connect`,
+    p_message: 'Accept their message request to start chatting.',
+    p_link: `/messages/${conv.id}`,
+    p_reference_id: conv.id,
+  })
+
+  redirect(`/messages/${conv.id}`)
+}
+
+// ============================================================
+// Navigate to an existing accepted conversation from the directory.
+// Only called when the conversation is already accepted.
+// ============================================================
+export async function navigateToConversation(conversationId: string) {
   redirect(`/messages/${conversationId}`)
 }
 
 // ============================================================
-// Send a message
+// Accept a pending message request (recipient only).
+// ============================================================
+export async function acceptMessageRequest(conversationId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase.rpc('accept_message_request', {
+    p_conversation_id: conversationId,
+  })
+
+  if (error) {
+    console.error('Error accepting message request:', error)
+    return { error: error.message }
+  }
+
+  revalidatePath('/messages')
+  revalidatePath(`/messages/${conversationId}`)
+  return { success: true }
+}
+
+// ============================================================
+// Decline / cancel a pending message request (either participant).
+// Deletes the conversation — the requester can send a new one later.
+// ============================================================
+export async function declineMessageRequest(conversationId: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase.rpc('decline_message_request', {
+    p_conversation_id: conversationId,
+  })
+
+  if (error) {
+    console.error('Error declining message request:', error)
+    return { error: error.message }
+  }
+
+  redirect('/messages')
+}
+
+// ============================================================
+// Send a message (only works when conversation is accepted).
 // ============================================================
 export async function sendMessage(conversationId: string, content: string) {
   const supabase = await createClient()
@@ -62,15 +129,19 @@ export async function sendMessage(conversationId: string, content: string) {
   if (!trimmed) return { error: 'Message cannot be empty' }
   if (trimmed.length > 4000) return { error: 'Message too long (max 4000 characters)' }
 
-  // Verify the user is a participant in this conversation
+  // Verify participant AND conversation is accepted
   const { data: conversation } = await supabase
     .from('conversations')
-    .select('id, participant_1, participant_2')
+    .select('id, participant_1, participant_2, status')
     .eq('id', conversationId)
     .single()
 
   if (!conversation || (conversation.participant_1 !== user.id && conversation.participant_2 !== user.id)) {
     return { error: 'Conversation not found' }
+  }
+
+  if (conversation.status !== 'accepted') {
+    return { error: 'Cannot send messages until the request is accepted' }
   }
 
   const { error: msgError } = await supabase
@@ -82,7 +153,6 @@ export async function sendMessage(conversationId: string, content: string) {
     return { error: msgError.message || 'Failed to send message' }
   }
 
-  // Bump last_message_at and store preview on the conversation
   const messagePreview = trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed
   await supabase
     .from('conversations')
@@ -93,12 +163,10 @@ export async function sendMessage(conversationId: string, content: string) {
     })
     .eq('id', conversationId)
 
-  // Notify the recipient (one notification per conversation, replace if exists)
   const recipientId = conversation.participant_1 === user.id
     ? conversation.participant_2
     : conversation.participant_1
 
-  // Fetch sender name for the notification title
   const { data: senderProfile } = await supabase
     .from('user_profiles')
     .select('full_name')
@@ -108,7 +176,6 @@ export async function sendMessage(conversationId: string, content: string) {
   const senderName = senderProfile?.full_name || 'Someone'
   const preview = trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed
 
-  // Remove any existing + create fresh notification (atomic, bypasses RLS)
   await supabase.rpc('upsert_message_notification', {
     p_user_id: recipientId,
     p_title: `New message from ${senderName}`,
@@ -129,7 +196,6 @@ export async function markConversationRead(conversationId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  // Mark all messages sent by the other party as read
   await supabase
     .from('messages')
     .update({ is_read: true })
@@ -137,7 +203,6 @@ export async function markConversationRead(conversationId: string) {
     .eq('is_read', false)
     .neq('sender_id', user.id)
 
-  // Dismiss any new_message notification for this conversation
   await supabase.rpc('dismiss_message_notifications', {
     p_conversation_id: conversationId,
   })
@@ -151,7 +216,6 @@ export async function loadEarlierMessages(conversationId: string, beforeCursor: 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { messages: [], hasMore: false }
 
-  // Verify the user is a participant
   const { data: conversation } = await supabase
     .from('conversations')
     .select('id, participant_1, participant_2')
@@ -173,9 +237,5 @@ export async function loadEarlierMessages(conversationId: string, beforeCursor: 
     .limit(PAGE_SIZE)
 
   const msgs = (olderMessages || []).reverse()
-
-  return {
-    messages: msgs,
-    hasMore: msgs.length === PAGE_SIZE,
-  }
+  return { messages: msgs, hasMore: msgs.length === PAGE_SIZE }
 }
