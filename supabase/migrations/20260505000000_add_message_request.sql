@@ -79,7 +79,12 @@ BEGIN
   -- Accept
   UPDATE public.conversations
   SET status = 'accepted'
-  WHERE id = p_conversation_id;
+  WHERE id = p_conversation_id
+    AND status = 'pending';
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Conversation is no longer pending';
+  END IF;
 
   -- Look up accepter's name for the notification
   SELECT full_name INTO v_accepter_name
