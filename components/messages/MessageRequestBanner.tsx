@@ -8,12 +8,14 @@ interface MessageRequestBannerProps {
   conversationId: string
   isRequester: boolean
   otherUserName: string
+  onAccepted: () => void
 }
 
 export function MessageRequestBanner({
   conversationId,
   isRequester,
   otherUserName,
+  onAccepted,
 }: MessageRequestBannerProps) {
   const [isAccepting, setIsAccepting] = useState(false)
   const [isDeclining, setIsDeclining] = useState(false)
@@ -24,8 +26,10 @@ export function MessageRequestBanner({
     setErrorMsg(null)
     try {
       const result = await acceptMessageRequest(conversationId)
-      if (result && 'error' in result && result.error) {
-        setErrorMsg(result.error)
+      if (result && 'error' in result) {
+        setErrorMsg(result.error ?? null)
+      } else {
+        onAccepted()
       }
     } finally {
       setIsAccepting(false)
