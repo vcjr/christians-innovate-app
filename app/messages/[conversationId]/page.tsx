@@ -21,7 +21,7 @@ export default async function ConversationPage({
   // Verify the current user is a participant
   const { data: conversation } = await supabase
     .from('conversations')
-    .select('id, participant_1, participant_2')
+    .select('id, participant_1, participant_2, status, requested_by')
     .eq('id', conversationId)
     .single()
 
@@ -69,6 +69,8 @@ export default async function ConversationPage({
       }}
       initialMessages={initialMessages}
       hasMore={initialMessages.length === PAGE_SIZE}
+      conversationStatus={(conversation.status as 'pending' | 'accepted') ?? 'accepted'}
+      requestedBy={conversation.requested_by ?? null}
     />
   )
 }

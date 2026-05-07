@@ -21,6 +21,8 @@ interface ConversationItem {
     sender_id: string
   } | null
   unreadCount: number
+  status: 'pending' | 'accepted'
+  requestedBy: string | null
 }
 
 interface ConversationListProps {
@@ -149,11 +151,24 @@ export function ConversationList({ conversations, currentUserId }: ConversationL
                       <p className={`text-sm truncate ${hasUnread || isActive ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
                         {conv.otherUser.full_name || 'Unknown User'}
                       </p>
-                      {conv.latestMessage && (
-                        <span className={`text-[10px] flex-shrink-0 ${hasUnread ? 'text-blue-600 font-semibold' : 'text-gray-400'}`}>
-                          {timeAgo(conv.latestMessage.created_at)}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {conv.latestMessage && (
+                          <span className={`text-[10px] flex-shrink-0 ${hasUnread ? 'text-blue-600 font-semibold' : 'text-gray-400'}`}>
+                            {timeAgo(conv.latestMessage.created_at)}
+                          </span>
+                        )}
+                        {conv.status === 'pending' ? (
+                          <span className="ml-auto shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            {conv.requestedBy === currentUserId ? 'Sent' : 'Request'}
+                          </span>
+                        ) : (
+                          hasUnread && (
+                            <span className="ml-auto shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+                              {conv.unreadCount}
+                            </span>
+                          )
+                        )}
+                      </div>
                     </div>
                     {conv.latestMessage ? (
                       <p className={`text-xs truncate mt-0.5 ${hasUnread ? 'text-gray-800 font-medium' : 'text-gray-500'}`}>
