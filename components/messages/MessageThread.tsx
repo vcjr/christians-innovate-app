@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Send, ChevronUp, Check, CheckCheck } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { sendMessage, loadEarlierMessages } from '@/app/messages/actions'
+import { MessageRequestBanner } from './MessageRequestBanner'
 
 interface Message {
   id: string
@@ -28,6 +29,8 @@ interface MessageThreadProps {
   otherUser: OtherUser
   initialMessages: Message[]
   hasMore: boolean
+  conversationStatus: 'pending' | 'accepted'
+  requestedBy: string | null
 }
 
 function formatMessageTime(dateStr: string): string {
@@ -84,6 +87,8 @@ export function MessageThread({
   otherUser,
   initialMessages,
   hasMore: initialHasMore,
+  conversationStatus,
+  requestedBy,
 }: MessageThreadProps) {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>(initialMessages)
@@ -269,74 +274,84 @@ export function MessageThread({
         aria-label={`Conversation with ${otherUser.full_name || 'user'}`}
         className="flex-1 overflow-y-auto px-5 py-4 space-y-1.5 bg-gray-50/40"
       >
-        {/* Load earlier messages */}
-        {hasMore && (
-          <div className="flex justify-center pb-2">
-            <button
-              onClick={handleLoadEarlier}
-              disabled={loadingMore}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-full shadow-sm hover:shadow transition disabled:opacity-50"
-            >
-              <ChevronUp className="h-3.5 w-3.5" />
-              {loadingMore ? 'Loading…' : 'Load earlier messages'}
-            </button>
-          </div>
-        )}
-
-        {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-sm text-gray-400 text-center">
-              No messages yet. Say hello!
-            </p>
-          </div>
-        )}
-
-        {messages.map((msg) => {
-          const isOwn = msg.sender_id === currentUserId
-          const isLastOwn = lastOwnMessage?.id === msg.id
-          return (
-            <Fragment key={msg.id}>
-              <div
-                className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                role="listitem"
-              >
-                <div
-                  className={`max-w-[72%] px-3.5 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isOwn
-                    ? 'bg-blue-600 text-white rounded-br-md'
-                    : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md shadow-sm'
-                    }`}
+        {conversationStatus === 'pending' ? (
+          <MessageRequestBanner
+            conversationId={conversationId}
+            isRequester={requestedBy === currentUserId}
+            otherUserName={otherUser.full_name ?? 'this person'}
+          />
+        ) : (
+          <>
+            {/* Load earlier messages */}
+            {hasMore && (
+              <div className="flex justify-center pb-2">
+                <button
+                  onClick={handleLoadEarlier}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-full shadow-sm hover:shadow transition disabled:opacity-50"
                 >
-                  <p>{linkifyContent(msg.content)}</p>
-                  <p className={`text-[10px] mt-0.5 ${isOwn ? 'text-blue-200' : 'text-gray-400'} text-right`}>
-                    {formatMessageTime(msg.created_at)}
-                  </p>
-                </div>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  {loadingMore ? 'Loading…' : 'Load earlier messages'}
+                </button>
               </div>
-              {/* Read receipt on last own message */}
-              {isOwn && isLastOwn && (
-                <div className="flex justify-end pr-1">
-                  <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400">
-                    {msg.is_read ? (
-                      <>
-                        <CheckCheck className="h-3 w-3 text-blue-500" />
-                        <span>Seen</span>
-                        <span className="sr-only">Message has been read</span>
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-3 w-3" />
-                        <span>Sent</span>
-                        <span className="sr-only">Message sent, not yet read</span>
-                      </>
-                    )}
-                  </span>
-                </div>
-              )}
-            </Fragment>
-          )
-        })}
+            )}
 
-        <div ref={messagesEndRef} />
+            {messages.length === 0 && (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-sm text-gray-400 text-center">
+                  No messages yet. Say hello!
+                </p>
+              </div>
+            )}
+
+            {messages.map((msg) => {
+              const isOwn = msg.sender_id === currentUserId
+              const isLastOwn = lastOwnMessage?.id === msg.id
+              return (
+                <Fragment key={msg.id}>
+                  <div
+                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                    role="listitem"
+                  >
+                    <div
+                      className={`max-w-[72%] px-3.5 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${isOwn
+                        ? 'bg-blue-600 text-white rounded-br-md'
+                        : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md shadow-sm'
+                        }`}
+                    >
+                      <p>{linkifyContent(msg.content)}</p>
+                      <p className={`text-[10px] mt-0.5 ${isOwn ? 'text-blue-200' : 'text-gray-400'} text-right`}>
+                        {formatMessageTime(msg.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                  {/* Read receipt on last own message */}
+                  {isOwn && isLastOwn && (
+                    <div className="flex justify-end pr-1">
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-400">
+                        {msg.is_read ? (
+                          <>
+                            <CheckCheck className="h-3 w-3 text-blue-500" />
+                            <span>Seen</span>
+                            <span className="sr-only">Message has been read</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="h-3 w-3" />
+                            <span>Sent</span>
+                            <span className="sr-only">Message sent, not yet read</span>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                </Fragment>
+              )
+            })}
+
+            <div ref={messagesEndRef} />
+          </>
+        )}
       </div>
 
       {/* Error */}
@@ -347,33 +362,35 @@ export function MessageThread({
       )}
 
       {/* Compose */}
-      <div className="flex-shrink-0 bg-white px-4 py-3">
-        <div className="flex items-end gap-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-300 transition">
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Write a message…"
-            aria-label={`Message to ${otherUser.full_name || 'user'}`}
-            rows={1}
-            maxLength={4000}
-            className="flex-1 resize-none bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none max-h-28 overflow-y-auto leading-normal"
-            style={{ minHeight: '24px' }}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!draft.trim() || isPending}
-            className="flex-shrink-0 p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
-            aria-label="Send message"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+      {conversationStatus === 'accepted' && (
+        <div className="flex-shrink-0 bg-white px-4 py-3">
+          <div className="flex items-end gap-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-300 transition">
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Write a message…"
+              aria-label={`Message to ${otherUser.full_name || 'user'}`}
+              rows={1}
+              maxLength={4000}
+              className="flex-1 resize-none bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none max-h-28 overflow-y-auto leading-normal"
+              style={{ minHeight: '24px' }}
+            />
+            <button
+              onClick={handleSend}
+              disabled={!draft.trim() || isPending}
+              className="flex-shrink-0 p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              aria-label="Send message"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1.5 ml-1">
+            Enter to send · Shift+Enter for new line
+          </p>
         </div>
-        <p className="text-[10px] text-gray-400 mt-1.5 ml-1">
-          Enter to send · Shift+Enter for new line
-        </p>
-      </div>
+      )}
     </div>
   )
 }
