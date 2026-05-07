@@ -66,6 +66,11 @@ export function ConversationList({ conversations, currentUserId }: ConversationL
         { event: 'UPDATE', schema: 'public', table: 'conversations' },
         () => { router.refresh() }
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'conversations' },
+        () => { router.refresh() }
+      )
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
