@@ -60,7 +60,7 @@ export default async function MessagesLayout({ children }: { children: React.Rea
         avatar_url: profile?.avatar_url ?? null,
       },
       latestMessage: c.last_message_preview
-        ? { content: c.last_message_preview, created_at: c.last_message_at, sender_id: c.last_message_sender_id }
+        ? { content: c.last_message_preview, created_at: c.last_message_at, sender_id: c.last_message_sender_id ?? null }
         : null,
       unreadCount: unreadByConv.get(c.id) ?? 0,
       status: (c.status as 'pending' | 'accepted') ?? 'accepted',

@@ -18,7 +18,7 @@ interface ConversationItem {
   latestMessage: {
     content: string
     created_at: string
-    sender_id: string
+    sender_id: string | null
   } | null
   unreadCount: number
   status: 'pending' | 'accepted'
@@ -59,6 +59,11 @@ export function ConversationList({ conversations, currentUserId }: ConversationL
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
+        () => { router.refresh() }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'conversations' },
         () => { router.refresh() }
       )
       .subscribe()
