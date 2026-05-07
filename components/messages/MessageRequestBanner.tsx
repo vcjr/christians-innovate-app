@@ -15,18 +15,34 @@ export function MessageRequestBanner({
   isRequester,
   otherUserName,
 }: MessageRequestBannerProps) {
-  const [isLoading, setIsLoading] = useState(false)
+  const [isAccepting, setIsAccepting] = useState(false)
+  const [isDeclining, setIsDeclining] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   async function handleAccept() {
-    setIsLoading(true)
-    await acceptMessageRequest(conversationId)
-    // revalidatePath in the action will cause a refresh; no need to setIsLoading(false)
+    setIsAccepting(true)
+    setErrorMsg(null)
+    try {
+      const result = await acceptMessageRequest(conversationId)
+      if (result && 'error' in result && result.error) {
+        setErrorMsg(result.error)
+      }
+    } finally {
+      setIsAccepting(false)
+    }
   }
 
   async function handleDecline() {
-    setIsLoading(true)
-    await declineMessageRequest(conversationId)
-    // action redirects to /messages on success
+    setIsDeclining(true)
+    setErrorMsg(null)
+    try {
+      const result = await declineMessageRequest(conversationId)
+      if (result && 'error' in result && result.error) {
+        setErrorMsg(result.error)
+      }
+    } finally {
+      setIsDeclining(false)
+    }
   }
 
   if (isRequester) {
@@ -41,12 +57,14 @@ export function MessageRequestBanner({
             You&apos;ll be notified when they accept. You can message once they do.
           </p>
         </div>
+        {errorMsg && <p className="text-sm text-red-500">{errorMsg}</p>}
         <button
+          type="button"
           onClick={handleDecline}
-          disabled={isLoading}
+          disabled={isDeclining}
           className="text-sm text-red-500 hover:text-red-700 disabled:opacity-50 transition"
         >
-          {isLoading ? 'Cancelling…' : 'Cancel request'}
+          {isDeclining ? 'Cancelling…' : 'Cancel request'}
         </button>
       </div>
     )
@@ -63,20 +81,23 @@ export function MessageRequestBanner({
           Accept their request to start exchanging messages.
         </p>
       </div>
+      {errorMsg && <p className="text-sm text-red-500">{errorMsg}</p>}
       <div className="flex gap-3">
         <button
+          type="button"
           onClick={handleAccept}
-          disabled={isLoading}
+          disabled={isAccepting || isDeclining}
           className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition"
         >
-          {isLoading ? 'Accepting…' : 'Accept'}
+          {isAccepting ? 'Accepting…' : 'Accept'}
         </button>
         <button
+          type="button"
           onClick={handleDecline}
-          disabled={isLoading}
+          disabled={isAccepting || isDeclining}
           className="px-5 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition"
         >
-          {isLoading ? 'Declining…' : 'Decline'}
+          {isDeclining ? 'Declining…' : 'Decline'}
         </button>
       </div>
     </div>
