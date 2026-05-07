@@ -71,7 +71,11 @@ export default async function ConversationPage({
       }}
       initialMessages={initialMessages}
       hasMore={initialMessages.length === PAGE_SIZE}
-      conversationStatus={(conversation.status as 'pending' | 'accepted') ?? 'accepted'}
+      conversationStatus={
+        conversation.status === 'pending' || conversation.status === 'accepted'
+          ? conversation.status
+          : 'pending'
+      }
       requestedBy={conversation.requested_by ?? null}
     />
   )

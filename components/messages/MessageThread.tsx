@@ -91,6 +91,7 @@ export function MessageThread({
   requestedBy,
 }: MessageThreadProps) {
   const router = useRouter()
+  const [status, setStatus] = useState(conversationStatus)
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -163,6 +164,22 @@ export function MessageThread({
           setMessages(prev =>
             prev.map(m => m.id === updated.id ? { ...m, is_read: updated.is_read } : m)
           )
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const newStatus = (payload.new as { status: string }).status
+          if (newStatus === 'accepted') {
+            setStatus('accepted')
+            router.refresh()
+          }
         }
       )
       .subscribe()
@@ -274,11 +291,15 @@ export function MessageThread({
         aria-label={`Conversation with ${otherUser.full_name || 'user'}`}
         className="flex-1 overflow-y-auto px-5 py-4 space-y-1.5 bg-gray-50/40"
       >
-        {conversationStatus === 'pending' ? (
+        {status === 'pending' ? (
           <MessageRequestBanner
             conversationId={conversationId}
             isRequester={requestedBy === currentUserId}
             otherUserName={otherUser.full_name ?? 'this person'}
+            onAccepted={() => {
+              setStatus('accepted')
+              router.refresh()
+            }}
           />
         ) : (
           <>
@@ -362,7 +383,7 @@ export function MessageThread({
       )}
 
       {/* Compose */}
-      {conversationStatus === 'accepted' && (
+      {status === 'accepted' && (
         <div className="flex-shrink-0 bg-white px-4 py-3">
           <div className="flex items-end gap-2 bg-white rounded-2xl border border-gray-200 px-3 py-2 shadow-sm focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-300 transition">
             <textarea
