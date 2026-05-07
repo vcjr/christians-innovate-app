@@ -182,6 +182,18 @@ export function MessageThread({
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'conversations',
+          filter: `id=eq.${conversationId}`,
+        },
+        () => {
+          router.replace('/messages')
+        }
+      )
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
