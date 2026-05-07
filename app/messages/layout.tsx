@@ -12,7 +12,7 @@ export default async function MessagesLayout({ children }: { children: React.Rea
 
   const { data: rawConversations } = await supabase
     .from('conversations')
-    .select('id, participant_1, participant_2, last_message_at, last_message_preview, last_message_sender_id, created_at')
+    .select('id, participant_1, participant_2, last_message_at, last_message_preview, last_message_sender_id, status, requested_by, created_at')
     .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`)
     .order('last_message_at', { ascending: false })
 
@@ -63,6 +63,8 @@ export default async function MessagesLayout({ children }: { children: React.Rea
         ? { content: c.last_message_preview, created_at: c.last_message_at, sender_id: c.last_message_sender_id }
         : null,
       unreadCount: unreadByConv.get(c.id) ?? 0,
+      status: (c.status as 'pending' | 'accepted') ?? 'accepted',
+      requestedBy: c.requested_by ?? null,
     }
   })
 
