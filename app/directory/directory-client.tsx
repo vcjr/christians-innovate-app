@@ -34,7 +34,7 @@ interface DirectoryClientProps {
   ownedGroups: OwnedGroup[]
   membershipByGroup: Record<string, string[]>
   pendingByGroup: Record<string, string[]>
-  conversationByUserId: Record<string, { id: string; status: string; requestedBy: string | null }>
+  conversationByUserId: Record<string, { id: string; status: 'pending' | 'accepted'; requestedBy: string | null }>
 }
 
 function getInitials(name: string | null): string {
