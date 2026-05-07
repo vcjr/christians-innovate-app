@@ -33,7 +33,7 @@ export default async function DirectoryPage() {
     .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`)
 
   // Build a map: otherUserId → { id, status, requestedBy }
-  const conversationByUserId = new Map<string, { id: string; status: string; requestedBy: string | null }>()
+  const conversationByUserId = new Map<string, { id: string; status: 'pending' | 'accepted'; requestedBy: string | null }>()
   for (const c of (existingConversations || [])) {
     const otherId = c.participant_1 === user.id ? c.participant_2 : c.participant_1
     conversationByUserId.set(otherId, {
