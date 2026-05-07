@@ -54,8 +54,10 @@ export default async function ConversationPage({
 
   const initialMessages = rawMessages || []
 
-  // Mark incoming messages as read server-side
-  await markConversationRead(conversationId)
+  // Mark incoming messages as read server-side (only when conversation is accepted)
+  if (conversation.status === 'accepted') {
+    await markConversationRead(conversationId)
+  }
 
   return (
     <MessageThread
