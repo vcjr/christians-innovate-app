@@ -59,6 +59,15 @@ export const useOnboarding = () => {
       const savedData = await persistence.rehydrate();
       const updates: Partial<UserProfile> = { ...savedData };
 
+      // Pre-seed full_name from auth metadata so the onboarding upsert
+      // doesn't overwrite the name the handle_new_user trigger wrote.
+      if (!updates.full_name) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.user_metadata?.full_name) {
+          updates.full_name = user.user_metadata.full_name;
+        }
+      }
+
       // Convert rehydrated Files back into preview URLs for the UI
       for (const field of ['avatar_url'] as const) {
         const value = savedData[field];
@@ -72,7 +81,7 @@ export const useOnboarding = () => {
     setIsMounted(true);
     };
     init();
-  }, [persistence, previews, updateProfile]);
+  }, [persistence, previews, updateProfile, supabase]);
 
   /**
    * Pillar: Performance - Sync progress to cookie for middleware-based resumption.

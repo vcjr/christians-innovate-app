@@ -79,20 +79,45 @@ Navbar condensed from 6 top-level items to 4 using dropdown menus, following pat
 - Added UUID validation on `conversationId` route parameter to prevent invalid database queries
 - Added `maxLength={4000}` on message textarea
 
+**Message Request Gate** — CI-36
+
+Users must now accept a connection request before a conversation can begin, preventing unsolicited messages.
+
+- Migration `20260505000000`: `status` (`pending` / `accepted`) and `requested_by` columns added to `conversations`; `message_request` type added to the notifications CHECK constraint; messages INSERT RLS updated to require `status = 'accepted'`; `accept_message_request()` and `decline_message_request()` SECURITY DEFINER functions handle the status transition atomically
+- Migration `20260507000000`: tightened conversations RLS — INSERT WITH CHECK requires `requested_by = auth.uid()` when pending; UPDATE policy locks to `status = 'accepted'` in both USING and WITH CHECK, blocking direct REST status flips
+- Server actions: `sendMessageRequest` (creates pending conversation + notifies recipient), `acceptMessageRequest` (calls RPC with auth guard), `declineMessageRequest` (calls RPC + redirects), `navigateToConversation`; `sendMessage` now rejects if conversation is not accepted
+- `MessageRequestBanner` component — requester view shows "Request sent" with a Cancel button; recipient view shows Accept and Decline buttons with per-action loading states, error display, and `try/finally` guards
+- Directory page: 4-state button per member — Connect (no conversation), Request Sent (pending, own request), Accept Request (pending, their request), Message (accepted)
+- `MessageThread`: compose bar and message history gated on `status`; `onAccepted` callback lifts status to local state so the UI unlocks without a full reload; Supabase realtime listeners handle conversations UPDATE (accept) and DELETE (decline/cancel → redirect)
+- `ConversationList`: pending conversations show "Request" or "Sent" badge instead of unread count; added UPDATE and DELETE realtime listeners
+
+**Scripture Reference Parsing Fix**
+
+- `utils/bible-api.ts`: added `BOOK_NAME_EXPANSIONS` map for common abbreviations (1 Cor, 2 Thess, etc.), `SINGLE_CHAPTER_BOOKS` set for bare-name references (Jude, Obadiah, Philemon, 2 John, 3 John), and `expandCompoundReference()` to split `2 & 3 John` → `2 John, 3 John` before parsing; all reading-plan references now resolve correctly
+
+**Fix: New Members Showing as "Anonymous User"**
+
+New members appeared in the Member Directory and messaging UI with no name despite having entered one at signup.
+
+- Root cause: `useOnboarding` initialized `full_name: ''`; `sanitizeProfileData` converted that to `null`; the onboarding upsert then overwrote the name the `handle_new_user` DB trigger had stored
+- `app/onboarding/useOnboarding.ts`: init effect now pre-seeds `full_name` from `user.user_metadata.full_name` (set at signup) before the onboarding payload is built
+- `lib/profile-utils.ts`: `sanitizeProfileData` now omits `full_name` from the upsert payload entirely when the value is empty, so the DB is never overwritten with `null`
+- Migration `20260508000000`: backfills `full_name` for all existing affected rows by pulling the name from `auth.users.raw_user_meta_data`
+
 ---
 
 ### Summary
 
-| Category          | Details                                                                                                                                             |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **New features**  | Real-time direct messaging, message notifications with dedup, auto-link URLs, read receipts, infinite scroll, sidebar search, nav dropdown grouping |
-| **Performance**   | Conversation preview columns eliminate N+1 message queries on sidebar                                                                               |
-| **Accessibility** | ARIA roles, live regions, and labels on messaging components                                                                                        |
-| **Security**      | SECURITY DEFINER functions for cross-user notification management, UUID validation, textarea max length                                             |
-| **Navigation**    | 6 nav items → 4 with Discover and Community dropdowns                                                                                               |
-| **Bug fixes**     | Page scroll, render-phase revalidation, optimistic message duplicates, conversation preview backfill                                                |
-| **Migrations**    | 3 new migration files                                                                                                                               |
-| **Files changed** | 18 files · +1 523 lines added · −283 lines removed                                                                                                  |
+| Category          | Details                                                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **New features**  | Real-time direct messaging, message notifications with dedup, auto-link URLs, read receipts, infinite scroll, sidebar search, nav dropdown grouping, message request gate |
+| **Performance**   | Conversation preview columns eliminate N+1 message queries on sidebar                                                                                           |
+| **Accessibility** | ARIA roles, live regions, and labels on messaging components                                                                                                    |
+| **Security**      | SECURITY DEFINER functions for cross-user notification management, tightened conversations RLS (INSERT/UPDATE policies), UUID validation, textarea max length   |
+| **Navigation**    | 6 nav items → 4 with Discover and Community dropdowns                                                                                                           |
+| **Bug fixes**     | Page scroll, render-phase revalidation, optimistic message duplicates, conversation preview backfill, scripture reference parsing, new-member name erasure      |
+| **Migrations**    | 6 new migration files                                                                                                                                           |
+| **Files changed** | 27+ files                                                                                                                                                       |
 
 
 ---
