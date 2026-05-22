@@ -51,6 +51,18 @@ function formatMessageTime(dateStr: string): string {
 // Auto-link URLs in message content
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g
 
+function sanitizeHttpUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl)
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString()
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 function linkifyContent(text: string): React.ReactNode {
   const parts: React.ReactNode[] = []
   let lastIndex = 0
@@ -62,17 +74,22 @@ function linkifyContent(text: string): React.ReactNode {
       parts.push(text.slice(lastIndex, match.index))
     }
     const url = match[0]
-    parts.push(
-      <a
-        key={match.index}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline break-all hover:opacity-80"
-      >
-        {url}
-      </a>
-    )
+    const safeUrl = sanitizeHttpUrl(url)
+    if (safeUrl) {
+      parts.push(
+        <a
+          key={match.index}
+          href={safeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline break-all hover:opacity-80"
+        >
+          {url}
+        </a>
+      )
+    } else {
+      parts.push(url)
+    }
     lastIndex = regex.lastIndex
   }
   if (lastIndex < text.length) {
