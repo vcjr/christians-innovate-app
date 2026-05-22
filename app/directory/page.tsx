@@ -26,6 +26,23 @@ export default async function DirectoryPage() {
     return redirect('/login')
   }
 
+  // Fetch all conversations for the current user (to show correct button state)
+  const { data: existingConversations } = await supabase
+    .from('conversations')
+    .select('id, participant_1, participant_2, status, requested_by')
+    .or(`participant_1.eq.${user.id},participant_2.eq.${user.id}`)
+
+  // Build a map: otherUserId → { id, status, requestedBy }
+  const conversationByUserId = new Map<string, { id: string; status: 'pending' | 'accepted'; requestedBy: string | null }>()
+  for (const c of (existingConversations || [])) {
+    const otherId = c.participant_1 === user.id ? c.participant_2 : c.participant_1
+    conversationByUserId.set(otherId, {
+      id: c.id,
+      status: c.status,
+      requestedBy: c.requested_by,
+    })
+  }
+
   // Fetch all groups this user is creator of
   const { data: ownedGroups } = await supabase
     .from('accountability_groups')
@@ -66,6 +83,7 @@ export default async function DirectoryPage() {
       ownedGroups={ownedGroups || []}
       membershipByGroup={membershipByGroup}
       pendingByGroup={pendingByGroup}
+      conversationByUserId={Object.fromEntries(conversationByUserId)}
     />
   )
 }

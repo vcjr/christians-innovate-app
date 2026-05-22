@@ -6,10 +6,22 @@ import { UserProfile } from '@/types/profile';
  * Moved to a logic file to avoid Next.js 'use server' constraints on synchronous exports.
  */
 export function sanitizeProfileData(data: Partial<UserProfile>): Partial<UserProfile> {
-  return {
+  const trimmedName = data.full_name?.trim();
+
+  const result: Partial<UserProfile> = {
     ...data,
-    full_name: data.full_name?.trim() || null,
+    // Only write full_name when a non-empty value was provided.
+    // An empty/missing value is omitted so the DB retains whatever
+    // was already there (e.g. set by the handle_new_user trigger).
+    full_name: trimmedName || undefined,
     bio: data.bio?.trim() || null,
     updated_at: new Date().toISOString(),
   };
+
+  // Remove the key entirely when undefined so PostgREST doesn't null it out
+  if (!result.full_name) {
+    delete result.full_name;
+  }
+
+  return result;
 }
