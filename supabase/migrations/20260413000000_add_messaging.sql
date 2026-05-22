@@ -11,7 +11,9 @@ CREATE TABLE public.conversations (
   created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
   -- Ensure uniqueness: store the smaller UUID first to avoid duplicates
   CONSTRAINT conversations_unique_participants UNIQUE (participant_1, participant_2),
-  CONSTRAINT conversations_no_self_chat CHECK (participant_1 <> participant_2)
+  CONSTRAINT conversations_no_self_chat CHECK (participant_1 <> participant_2),
+  -- Enforce canonical ordering so (A,B) and (B,A) cannot both exist
+  CONSTRAINT conversations_participant_order_check CHECK (participant_1 < participant_2)
 );
 
 -- 2. Messages table
