@@ -74,6 +74,40 @@ describe('completeOnboardingAction Atomic Sync', () => {
     expect(mockUpsert).not.toHaveBeenCalled();
   });
 
+  it('should not include full_name in the upsert payload if full_name is empty or whitespace-only', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user_123' } }, error: null });
+    mockUpdateUser.mockResolvedValue({ data: {}, error: null });
+
+    const testData = { bio: 'Test Bio', full_name: '   ' };
+    const result = await completeOnboardingAction(testData);
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        full_name: expect.anything(),
+      }),
+      { onConflict: 'user_id' }
+    );
+    expect(result.error).toBeNull();
+  });
+
+  it('should include full_name in the upsert payload if full_name is a non-empty string', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user_123' } }, error: null });
+    mockUpdateUser.mockResolvedValue({ data: {}, error: null });
+
+    const testData = { bio: 'Test Bio', full_name: 'Jane Doe' };
+    const result = await completeOnboardingAction(testData);
+
+    expect(mockUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        full_name: 'Jane Doe',
+        user_id: 'user_123',
+        has_completed_onboarding: true,
+      }),
+      { onConflict: 'user_id' }
+    );
+    expect(result.error).toBeNull();
+  });
+
   it('should fail if the database update fails', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user_123' } }, error: null });
     mockUpsert.mockReturnValue({
