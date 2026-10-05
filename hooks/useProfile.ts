@@ -6,7 +6,6 @@ import { updateProfileAction } from '@/lib/actions/profile';
 import { completeOnboardingAction } from '@/lib/actions/onboarding';
 
 const initialProfile: Partial<UserProfile> = {
-  full_name: '',
   bio: '',
   skills: [],
   interests: [],
