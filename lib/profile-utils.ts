@@ -6,10 +6,18 @@ import { UserProfile } from '@/types/profile';
  * Moved to a logic file to avoid Next.js 'use server' constraints on synchronous exports.
  */
 export function sanitizeProfileData(data: Partial<UserProfile>): Partial<UserProfile> {
-  return {
+  const sanitized: Partial<UserProfile> = {
     ...data,
-    full_name: data.full_name?.trim() || null,
-    bio: data.bio?.trim() || null,
     updated_at: new Date().toISOString(),
   };
+
+  if (data.full_name !== undefined) {
+    sanitized.full_name = data.full_name?.trim() || null;
+  }
+
+  if (data.bio !== undefined) {
+    sanitized.bio = data.bio?.trim() || null;
+  }
+
+  return sanitized;
 }

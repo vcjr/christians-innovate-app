@@ -44,6 +44,13 @@ A floating feedback button available on every page for authenticated users, enab
 | **Migrations**    | 2 new migration files (`feedback` table, `feedback-screenshots` bucket)                                                 |
 | **Files changed** | 6 files · +531 lines added · −20 lines removed                                                                          |
 
+**Bible Reading Plan — Scripture Reference Parsing Fixes**
+
+Fixed three parsing gaps in `utils/bible-api.ts` that prevented certain reading plan entries from loading verses:
+
+- **Abbreviations**: added `BOOK_NAME_EXPANSIONS` map so shorthand book names (`2 Cor`, `1 Thess`, `2 Thess`, `1 Cor`, etc.) expand to the canonical full names stored in the database before the Supabase query runs
+- **Single-chapter books**: added a fourth parse pattern to handle bare book names with no chapter number (`Jude`, `Philemon`), defaulting to chapter 1
+- **Compound `&` references**: added `expandCompoundReference()` to rewrite entries like `2 & 3 John` into `2 John, 3 John` before the comma-split, so both books are fetched correctly
 
 ---
 
