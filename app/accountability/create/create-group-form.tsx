@@ -1,34 +1,46 @@
 'use client'
 
 import { createGroup } from '../actions'
-import { useState } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 
 export function CreateGroupForm() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Synchronous guard: state updates are async, so rapid taps (common on mobile)
+  // can queue multiple submissions before the button re-renders as disabled.
+  const submittingRef = useRef(false)
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    // Use onSubmit (not a form action) so the disabled state renders immediately;
+    // state updates inside a form action transition aren't committed until it finishes.
+    event.preventDefault()
+    if (submittingRef.current) return
+    submittingRef.current = true
+
+    const formData = new FormData(event.currentTarget)
+
     setError(null)
     setIsSubmitting(true)
-    
+
     try {
       const result = await createGroup(formData)
 
       // Handle validation/auth errors returned as an object instead of thrown
       if (result && typeof result === 'object' && 'error' in result && result.error) {
         setError(result.error as string)
+        submittingRef.current = false
+        setIsSubmitting(false)
       }
-
-      // If there was no redirect/throw, ensure submitting state is reset
-      setIsSubmitting(false)
+      // On success the action redirects; keep the form locked so it can't be resubmitted
     } catch (err: any) {
       setError(err?.message || 'Failed to create group')
+      submittingRef.current = false
       setIsSubmitting(false)
     }
   }
 
   return (
-    <form action={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {error}
