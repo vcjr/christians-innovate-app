@@ -17,16 +17,14 @@
 -- DEFINER functions, which bypass RLS.
 -- ============================================================
 
--- Fix gap 1: constrain requested_by on INSERT
+-- Fix gap 1: constrain requested_by on INSERT and disallow inserting accepted conversations
 DROP POLICY IF EXISTS "Create conversations" ON public.conversations;
 CREATE POLICY "Create conversations" ON public.conversations
   FOR INSERT TO authenticated
   WITH CHECK (
     (auth.uid() = participant_1 OR auth.uid() = participant_2)
-    AND (
-      status = 'accepted'
-      OR (status = 'pending' AND requested_by = auth.uid())
-    )
+    AND status = 'pending'
+    AND requested_by = auth.uid()
   );
 
 -- Fix gap 2: restrict direct UPDATE to accepted conversations only
@@ -42,3 +40,26 @@ CREATE POLICY "Update own conversations" ON public.conversations
     (auth.uid() = participant_1 OR auth.uid() = participant_2)
     AND status = 'accepted'
   );
+
+-- Prevent direct mutation of identity columns (participant_1, participant_2, requested_by)
+-- even on accepted conversations. Status transitions go through SECURITY DEFINER functions.
+CREATE OR REPLACE FUNCTION public.prevent_conversation_identity_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NEW.participant_1 <> OLD.participant_1 OR
+     NEW.participant_2 <> OLD.participant_2 OR
+     NEW.requested_by IS DISTINCT FROM OLD.requested_by THEN
+    RAISE EXCEPTION 'Cannot modify participant or requester identity of a conversation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_conversation_identity_immutability ON public.conversations;
+CREATE TRIGGER enforce_conversation_identity_immutability
+  BEFORE UPDATE ON public.conversations
+  FOR EACH ROW EXECUTE FUNCTION public.prevent_conversation_identity_change();

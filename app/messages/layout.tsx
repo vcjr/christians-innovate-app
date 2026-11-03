@@ -31,21 +31,11 @@ export default async function MessagesLayout({ children }: { children: React.Rea
 
   const profilesById = new Map((profiles || []).map(p => [p.user_id, p]))
 
-  // Fetch unread counts per conversation (only unread messages not sent by current user)
-  const conversationIds = conversations.map(c => c.id)
+  // Fetch unread counts per conversation via server-side aggregate RPC
   const unreadByConv = new Map<string, number>()
-
-  if (conversationIds.length > 0) {
-    const { data: unreadMessages } = await supabase
-      .from('messages')
-      .select('conversation_id')
-      .in('conversation_id', conversationIds)
-      .eq('is_read', false)
-      .neq('sender_id', user.id)
-
-    for (const msg of (unreadMessages || [])) {
-      unreadByConv.set(msg.conversation_id, (unreadByConv.get(msg.conversation_id) ?? 0) + 1)
-    }
+  const { data: unreadCounts } = await supabase.rpc('get_unread_message_counts')
+  for (const row of (unreadCounts || [])) {
+    unreadByConv.set(row.conversation_id, Number(row.unread_count))
   }
 
   const enrichedConversations = conversations.map(c => {

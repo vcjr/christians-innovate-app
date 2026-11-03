@@ -119,13 +119,14 @@ export function MessageThread({
   const [hasMore, setHasMore] = useState(initialHasMore)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom only when new messages are appended (not when older messages are prepended)
   useEffect(() => {
+    if (loadingMore) return
     const container = messagesContainerRef.current
     if (container) {
       container.scrollTop = container.scrollHeight
     }
-  }, [messages])
+  }, [messages, loadingMore])
 
   // Real-time subscription for incoming messages and read receipts
   useEffect(() => {
@@ -257,22 +258,27 @@ export function MessageThread({
     const container = messagesContainerRef.current
     const scrollHeightBefore = container?.scrollHeight ?? 0
 
-    const oldest = messages[0]
-    const result = await loadEarlierMessages(conversationId, oldest.created_at)
+    try {
+      const oldest = messages[0]
+      const result = await loadEarlierMessages(conversationId, oldest.created_at)
 
-    if (result.messages.length > 0) {
-      setMessages(prev => [...result.messages, ...prev])
-    }
-    setHasMore(result.hasMore)
-    setLoadingMore(false)
-
-    // Preserve scroll position after prepending
-    requestAnimationFrame(() => {
-      if (container) {
-        const scrollHeightAfter = container.scrollHeight
-        container.scrollTop = scrollHeightAfter - scrollHeightBefore
+      if (result.messages.length > 0) {
+        setMessages(prev => [...result.messages, ...prev])
       }
-    })
+      setHasMore(result.hasMore)
+
+      // Preserve scroll position after prepending
+      requestAnimationFrame(() => {
+        if (container) {
+          const scrollHeightAfter = container.scrollHeight
+          container.scrollTop = scrollHeightAfter - scrollHeightBefore
+        }
+      })
+    } catch (err) {
+      console.error('Failed to load earlier messages:', err)
+    } finally {
+      setLoadingMore(false)
+    }
   }, [loadingMore, hasMore, messages, conversationId])
 
   // Find the last own message for read receipt

@@ -26,7 +26,7 @@ Fixed three parsing gaps in `utils/bible-api.ts` that prevented certain reading 
 A full real-time direct messaging system enabling one-on-one conversations between community members, with a LinkedIn-style two-panel layout that adapts responsively for mobile.
 
 - Migrations: `conversations` and `messages` tables with RLS, realtime publication, and indexes for fast lookups
-- Server actions: `getOrCreateConversation`, `startConversation`, `sendMessage`, `markConversationRead`, `loadEarlierMessages`
+- Server actions: `sendMessageRequest`, `navigateToConversation`, `sendMessage`, `markConversationRead`, `loadEarlierMessages`
 - Two-panel layout: `MessagingLayout` (fixed positioning below nav), `ConversationList` sidebar, `MessageThread` main panel
 - Real-time messaging via Supabase `postgres_changes` subscription (INSERT + UPDATE channels)
 - Optimistic message rendering with rollback on failure; real-time handler replaces optimistic entries to prevent duplicates
