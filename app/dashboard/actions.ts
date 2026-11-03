@@ -133,6 +133,16 @@ export async function unsubscribeFromPlan(planId: string) {
     return { error: error.message }
   }
 
+  // Opt the user out of auto-enrollment so the dashboard doesn't re-subscribe them
+  const { error: profileError } = await supabase
+    .from('user_profiles')
+    .update({ bible_year: false })
+    .eq('user_id', user.id)
+
+  if (profileError) {
+    console.error('Failed to clear bible_year after unsubscribe:', profileError)
+  }
+
   revalidatePath('/dashboard')
   return { success: true }
 }
