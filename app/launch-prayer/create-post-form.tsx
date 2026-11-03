@@ -37,14 +37,38 @@ export function CreatePostForm() {
     { value: 'win', label: 'Win/Praise', icon: Trophy, color: 'yellow' }
   ]
 
+  const ctaOptions = [
+    { value: 'launch', label: 'Post Launch Alert', icon: Rocket, className: 'bg-blue-600 hover:bg-blue-700' },
+    { value: 'prayer', label: 'Post Prayer Request', icon: Heart, className: 'bg-red-600 hover:bg-red-700' },
+    { value: 'win', label: 'Share a Win', icon: Trophy, className: 'bg-yellow-500 hover:bg-yellow-600' }
+  ] as const
+
+  const submitLabel = ctaOptions.find((option) => option.value === selectedType)?.label ?? 'Post'
+
+  const openForm = (type: 'launch' | 'prayer' | 'win') => {
+    setSelectedType(type)
+    setError(null)
+    setIsOpen(true)
+  }
+
   if (!isOpen) {
     return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors"
-      >
-        + Share Your Update
-      </button>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {ctaOptions.map((option) => {
+          const Icon = option.icon
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => openForm(option.value)}
+              className={`w-full px-4 py-3 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${option.className}`}
+            >
+              <Icon className="h-5 w-5" />
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
     )
   }
 
@@ -150,7 +174,7 @@ export function CreatePostForm() {
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            Post
+            {submitLabel}
           </button>
         </div>
       </form>
