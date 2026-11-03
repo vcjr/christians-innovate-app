@@ -698,6 +698,26 @@ class SupabaseBackend implements Backend {
     },
   );
 
+  // Meetings
+
+  @override
+  Future<Meeting?> nextMeeting() => _read(_k('meeting'), () async {
+    final now = DateTime.now();
+    final row = await _db
+        .from('meetings')
+        .select('id, title, description, zoom_link, meeting_date')
+        .eq('is_active', true)
+        .gte('meeting_date', DateTime(now.year, now.month, now.day).toUtc().toIso8601String())
+        .order('meeting_date', ascending: true)
+        .limit(1)
+        .maybeSingle();
+    // Wrapped, so "no meeting" is saved too rather than looking like nothing was saved.
+    return {'meeting': row};
+  }, (raw) => raw['meeting'] == null ? null : Meeting.fromRow((raw['meeting'] as Map).cast<String, dynamic>()));
+
+  @override
+  Future<void> recordAttendance(String meetingId) => _change({'op': 'attendance', 'meeting': meetingId});
+
   @override
   Future<String> createGroup(String name, String objective) => _run(() async {
     final g = await _db
@@ -953,6 +973,12 @@ class SupabaseBackend implements Backend {
         }
       case 'notification_read':
         await _db.from('notifications').update({'is_read': true}).eq('id', c['notification'] as String).eq('user_id', uid);
+      case 'attendance':
+        try {
+          await _db.from('meeting_attendance').insert({'meeting_id': c['meeting'], 'user_id': uid});
+        } on PostgrestException catch (e) {
+          if (e.code != '23505') rethrow; // Already recorded, as on the web.
+        }
     }
   }
 

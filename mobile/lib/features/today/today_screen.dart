@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/providers.dart';
 import '../../app/theme.dart';
@@ -20,6 +23,7 @@ class TodayScreen extends ConsumerWidget {
     ref.invalidate(postsProvider);
     ref.invalidate(myGroupsProvider);
     ref.invalidate(notificationsProvider);
+    ref.invalidate(nextMeetingProvider);
     await ref.read(activePlanProvider.future);
   }
 
@@ -62,6 +66,7 @@ class TodayScreen extends ConsumerWidget {
               const SizedBox(height: Tokens.space2),
               FadeSlideIn(child: Text(greetingFor(now, profile?.firstName), style: context.displayText(size: 30))),
               const SizedBox(height: Tokens.space5),
+              const _MeetingCard(),
               FadeSlideIn(
                 index: 1,
                 child: AsyncBody<ReadingPlan?>(
@@ -74,6 +79,163 @@ class TodayScreen extends ConsumerWidget {
               const FadeSlideIn(index: 2, child: _PrayerPreview()),
               const FadeSlideIn(index: 3, child: _GroupPreview()),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The next community meeting, like the web's announcement bar: when it is, and a button that
+/// records attendance and opens Zoom. Closing it hides that meeting on this device.
+class _MeetingCard extends ConsumerStatefulWidget {
+  const _MeetingCard();
+
+  @override
+  ConsumerState<_MeetingCard> createState() => _MeetingCardState();
+}
+
+class _MeetingCardState extends ConsumerState<_MeetingCard> {
+  late final Timer _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    // Re-checks the time each minute so the card turns "live" when the meeting starts.
+    _tick = Timer.periodic(const Duration(minutes: 1), (_) => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _tick.cancel();
+    super.dispose();
+  }
+
+  Future<void> _join(Meeting m) async {
+    // Attendance is best effort; it never stands between the member and the meeting.
+    unawaited(ref.read(backendProvider).recordAttendance(m.id).catchError((Object _) {}));
+    final ok = await launchUrl(Uri.parse(m.zoomLink), mode: LaunchMode.externalApplication);
+    if (!ok && mounted) showToast(context, 'Couldn’t open the meeting link.');
+  }
+
+  static String _when(Meeting m, DateTime now) {
+    final at = m.startsAt;
+    final time = DateFormat('h:mm a').format(at);
+    if (at.year == now.year && at.month == now.month && at.day == now.day) return 'Today at $time';
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    if (at.year == tomorrow.year && at.month == tomorrow.month && at.day == tomorrow.day) return 'Tomorrow at $time';
+    return DateFormat('EEEE, MMM d · h:mm a').format(at);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = ref.watch(nextMeetingProvider).value;
+    if (m == null || ref.watch(dismissedMeetingsProvider).contains(m.id)) return const SizedBox.shrink();
+    final now = DateTime.now();
+    final live = m.isLive(now);
+    final accent = live ? Tokens.danger : context.colors.primary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Tokens.space3),
+      child: FadeSlideIn(
+        child: Container(
+          key: const Key('meeting-card'),
+          decoration: BoxDecoration(
+            color: context.colors.surface,
+            borderRadius: BorderRadius.circular(Tokens.radiusM),
+            border: Border.all(color: live ? accent.withValues(alpha: 0.5) : context.ci.line, width: live ? 1.5 : 1),
+          ),
+          padding: const EdgeInsets.fromLTRB(Tokens.space4, Tokens.space3, Tokens.space2, Tokens.space4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  if (live) const _LiveDot() else Icon(Icons.event_rounded, size: 16, color: accent),
+                  const SizedBox(width: Tokens.space2),
+                  Expanded(
+                    child: Text(live ? 'HAPPENING NOW' : 'COMMUNITY MEETING', style: context.text.labelSmall?.copyWith(color: accent)),
+                  ),
+                  IconButton(
+                    tooltip: 'Hide this meeting',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => ref.read(dismissedMeetingsProvider.notifier).dismiss(m.id),
+                    icon: Icon(Icons.close_rounded, size: 20, color: context.ci.muted),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: Tokens.space2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(m.title, style: context.text.titleMedium),
+                    const SizedBox(height: 2),
+                    Text(live ? 'Started ${DateFormat('h:mm a').format(m.startsAt)}' : _when(m, now), style: context.text.bodySmall),
+                    if (m.description?.trim().isNotEmpty ?? false) ...[
+                      const SizedBox(height: Tokens.space2),
+                      Text(m.description!, style: context.text.bodyMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ],
+                    const SizedBox(height: Tokens.space3),
+                    FilledButton.icon(
+                      key: const Key('join-meeting'),
+                      onPressed: () => _join(m),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accent,
+                        minimumSize: const Size(0, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: Tokens.space5),
+                      ),
+                      icon: const Icon(Icons.videocam_rounded, size: 20),
+                      label: Text(live ? 'Join now on Zoom' : 'Join on Zoom'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A red dot that pulses while a meeting is live.
+class _LiveDot extends StatefulWidget {
+  const _LiveDot();
+
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat(reverse: true, count: 20);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 16,
+      child: Center(
+        child: AnimatedBuilder(
+          animation: _c,
+          builder: (_, _) => Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: Tokens.danger,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Tokens.danger.withValues(alpha: 0.5 * (1 - _c.value)),
+                  blurRadius: 2,
+                  spreadRadius: 6 * _c.value,
+                ),
+              ],
+            ),
           ),
         ),
       ),

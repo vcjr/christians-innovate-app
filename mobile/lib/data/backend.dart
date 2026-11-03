@@ -70,6 +70,12 @@ abstract interface class Backend {
   Future<void> markAllNotificationsRead();
   Future<List<Resource>> resources();
 
+  /// The next active meeting from the start of today on, as the web's announcement bar shows.
+  Future<Meeting?> nextMeeting();
+
+  /// Records that the member joined, as the web does when they open the Zoom link.
+  Future<void> recordAttendance(String meetingId);
+
   // Offline
 
   /// Whether the server is reachable and how many changes are waiting to be sent.

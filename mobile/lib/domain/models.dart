@@ -356,6 +356,30 @@ class AppNotification {
   );
 }
 
+/// A community meeting an admin scheduled on the web, with its Zoom link.
+class Meeting {
+  const Meeting({required this.id, required this.title, this.description, required this.zoomLink, required this.startsAt});
+
+  factory Meeting.fromRow(Map<String, dynamic> r) => Meeting(
+    id: r['id'] as String,
+    title: r['title'] as String,
+    description: r['description'] as String?,
+    zoomLink: r['zoom_link'] as String,
+    startsAt: _date(r['meeting_date']),
+  );
+
+  final String id;
+  final String title;
+  final String? description;
+  final String zoomLink;
+  final DateTime startsAt;
+
+  /// Meetings have no end time, so "live" runs from shortly before the start until an hour
+  /// and a half after it.
+  bool isLive(DateTime now) =>
+      !now.isBefore(startsAt.subtract(const Duration(minutes: 15))) && now.isBefore(startsAt.add(const Duration(minutes: 90)));
+}
+
 class Resource {
   const Resource({
     required this.id,

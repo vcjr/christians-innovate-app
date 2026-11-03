@@ -1,4 +1,5 @@
 import 'package:ci_mobile/app/providers.dart';
+import 'package:ci_mobile/domain/models.dart';
 import 'package:ci_mobile/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,6 +83,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(backend.calls, contains('setPraying p1 true'));
     expect(find.text('Praying · 3'), findsOneWidget);
+  });
+
+  testWidgets('a live meeting shows on Today and can be hidden', (tester) async {
+    final backend = FakeBackend()
+      ..meeting = Meeting(
+        id: 'm1',
+        title: 'Monthly Gathering',
+        description: 'Founders share what they’re building.',
+        zoomLink: 'https://zoom.us/j/1',
+        startsAt: DateTime.now().subtract(const Duration(minutes: 5)),
+      );
+    await pumpApp(tester, backend);
+    expect(find.text('Monthly Gathering'), findsOneWidget);
+    expect(find.text('HAPPENING NOW'), findsOneWidget);
+    expect(find.text('Join now on Zoom'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Hide this meeting'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('meeting-card')), findsNothing);
   });
 
   testWidgets('new members go through onboarding once', (tester) async {

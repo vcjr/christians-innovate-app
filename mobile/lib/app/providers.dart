@@ -137,6 +137,28 @@ final unreadCountProvider = Provider<int>((ref) => (ref.watch(notificationsProvi
 
 final resourcesProvider = FutureProvider.autoDispose<List<Resource>>((ref) => ref.watch(backendProvider).resources());
 
+// Meetings
+
+final nextMeetingProvider = FutureProvider<Meeting?>((ref) async {
+  ref.watch(userIdProvider);
+  return ref.watch(backendProvider).nextMeeting();
+});
+
+/// Meetings the member closed the card for, kept on the device so it stays closed.
+final dismissedMeetingsProvider = NotifierProvider<DismissedMeetings, Set<String>>(DismissedMeetings.new);
+
+class DismissedMeetings extends Notifier<Set<String>> {
+  static const _key = 'dismissed_meetings';
+
+  @override
+  Set<String> build() => {...?ref.watch(preferencesProvider).getStringList(_key)};
+
+  void dismiss(String meetingId) {
+    state = {...state, meetingId};
+    ref.read(preferencesProvider).setStringList(_key, state.toList());
+  }
+}
+
 // Offline
 
 final syncStateProvider = StreamProvider<SyncState>((ref) async* {
@@ -159,7 +181,8 @@ void refreshAfterSync(WidgetRef ref) {
     ..invalidate(invitationsProvider)
     ..invalidate(groupProvider)
     ..invalidate(notificationsProvider)
-    ..invalidate(resourcesProvider);
+    ..invalidate(resourcesProvider)
+    ..invalidate(nextMeetingProvider);
 }
 
 final downloadedTranslationsProvider = FutureProvider<Set<String>>((ref) => ref.watch(backendProvider).downloadedTranslations());

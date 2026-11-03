@@ -183,6 +183,13 @@ class FakeBackend implements Backend {
   @override
   Future<List<Resource>> resources() async => const [];
 
+  Meeting? meeting;
+
+  @override
+  Future<Meeting?> nextMeeting() async => meeting;
+  @override
+  Future<void> recordAttendance(String meetingId) async => calls.add('attend $meetingId');
+
   var _syncState = const SyncState();
   final _syncStates = StreamController<SyncState>.broadcast();
   final downloaded = <String>{};

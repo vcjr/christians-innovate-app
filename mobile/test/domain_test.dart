@@ -104,6 +104,14 @@ void main() {
     });
   });
 
+  test('a meeting is live from 15 minutes before until 90 minutes after it starts', () {
+    final m = Meeting(id: 'm', title: 'T', zoomLink: 'z', startsAt: DateTime(2026, 11, 3, 19));
+    expect(m.isLive(DateTime(2026, 11, 3, 18, 44)), isFalse);
+    expect(m.isLive(DateTime(2026, 11, 3, 18, 45)), isTrue);
+    expect(m.isLive(DateTime(2026, 11, 3, 20, 29)), isTrue);
+    expect(m.isLive(DateTime(2026, 11, 3, 20, 30)), isFalse);
+  });
+
   test('streak milestones', () {
     expect(
       [
