@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe, UserPlus, Clock, Loader2, X, Target } from 'lucide-react'
+import { Users, Briefcase, Heart, User, Linkedin, Facebook, Twitter, Globe, UserPlus, Clock, Loader2, X, Target, Search } from 'lucide-react'
 import { sendGroupInvitation } from '@/app/accountability/actions'
 
 interface UserProfile {
@@ -44,10 +44,32 @@ function getInitials(name: string | null): string {
   return name.substring(0, 2).toUpperCase()
 }
 
+const SEARCH_DEBOUNCE_MS = 250
+
+export function filterProfiles(profiles: UserProfile[], query: string): UserProfile[] {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (terms.length === 0) return profiles
+
+  return profiles.filter(profile => {
+    const haystack = [
+      profile.full_name,
+      profile.bio,
+      ...(profile.skills || []),
+      ...(profile.interests || []),
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+    return terms.every(term => haystack.includes(term))
+  })
+}
+
 export function DirectoryClient({ profiles, currentUserId, ownedGroups, membershipByGroup, pendingByGroup }: DirectoryClientProps) {
   const router = useRouter()
   const [expandedSkills, setExpandedSkills] = useState<Set<string>>(new Set())
   const [expandedInterests, setExpandedInterests] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   // Modal state
@@ -55,6 +77,19 @@ export function DirectoryClient({ profiles, currentUserId, ownedGroups, membersh
   const [invitingGroupId, setInvitingGroupId] = useState<string | null>(null)
   // Track locally sent invites: groupId -> Set of userIds
   const [sentInvites, setSentInvites] = useState<Record<string, Set<string>>>({})
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const filteredProfiles = useMemo(() => filterProfiles(profiles, debouncedQuery), [profiles, debouncedQuery])
+  const isSearching = debouncedQuery.trim().length > 0
+
+  const clearSearch = () => {
+    setSearchQuery('')
+    setDebouncedQuery('')
+  }
 
   const openModal = (userId: string, userName: string) => setModalTarget({ userId, userName })
   const closeModal = () => { setModalTarget(null); setInvitingGroupId(null) }
@@ -119,6 +154,45 @@ export function DirectoryClient({ profiles, currentUserId, ownedGroups, membersh
           </p>
         </div>
 
+        {/* Search */}
+        <div className="mb-8" role="search">
+          <label htmlFor="member-search" className="sr-only">
+            Search members by name, skills, or interests
+          </label>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" aria-hidden="true" />
+            <input
+              id="member-search"
+              type="search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') clearSearch() }}
+              placeholder="Search by name, skills, or interests..."
+              autoComplete="off"
+              aria-controls="member-grid"
+              className="w-full rounded-lg border border-gray-300 bg-white py-3 pl-10 pr-10 text-gray-900 placeholder-gray-400 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 [&::-webkit-search-cancel-button]:hidden"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                aria-label="Clear search"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <p className="sr-only" role="status" aria-live="polite">
+            {isSearching ? `${filteredProfiles.length} of ${profiles.length} members match your search` : ''}
+          </p>
+          {isSearching && (
+            <p className="mt-2 text-sm text-gray-600" aria-hidden="true">
+              Showing {filteredProfiles.length} of {profiles.length} members
+            </p>
+          )}
+        </div>
+
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
@@ -163,8 +237,8 @@ export function DirectoryClient({ profiles, currentUserId, ownedGroups, membersh
         </div>
 
         {/* Member Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {profiles.map((profile) => {
+        <div id="member-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProfiles.map((profile) => {
             const skillsExpanded = expandedSkills.has(profile.id)
             const interestsExpanded = expandedInterests.has(profile.id)
 
@@ -331,6 +405,22 @@ export function DirectoryClient({ profiles, currentUserId, ownedGroups, membersh
             <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No members yet</h3>
             <p className="text-gray-600">Be the first to complete your profile!</p>
+          </div>
+        )}
+
+        {/* No Search Results */}
+        {profiles.length > 0 && filteredProfiles.length === 0 && (
+          <div className="text-center py-12">
+            <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No members found matching your search</h3>
+            <p className="text-gray-600 mb-4">Try a different name, skill, or interest.</p>
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+            >
+              Reset filters
+            </button>
           </div>
         )}
       </div>
