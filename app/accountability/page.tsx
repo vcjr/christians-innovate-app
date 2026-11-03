@@ -193,6 +193,18 @@ export default async function AccountabilityPage({
     ? await supabase.from('user_profiles').select('user_id, full_name, avatar_url, email').in('user_id', memberIds)
     : { data: [] as { user_id: string; full_name: string | null; avatar_url: string | null; email: string | null }[] }
 
+  // For group creators, fetch users that can be invited and pending invitations
+  let inviteCandidates: { user_id: string; full_name: string | null; avatar_url: string | null }[] = []
+  let pendingInviteUserIds: string[] = []
+  if (activeGroup.created_by === user.id) {
+    const [{ data: candidateProfiles }, { data: pendingInvites }] = await Promise.all([
+      supabase.from('user_profiles').select('user_id, full_name, avatar_url').order('full_name', { ascending: true }),
+      supabase.from('group_invitations').select('invited_user_id').eq('group_id', activeGroup.id).eq('status', 'pending'),
+    ])
+    inviteCandidates = (candidateProfiles || []).filter(p => !memberIds.includes(p.user_id))
+    pendingInviteUserIds = (pendingInvites || []).map(i => i.invited_user_id)
+  }
+
   // Fetch commitments for the active group
   const { data: rawCommitments } = await supabase
     .from('group_commitments')
@@ -289,6 +301,8 @@ export default async function AccountabilityPage({
         commitments={commitments}
         reflections={reflections}
         currentUserId={user.id}
+        inviteCandidates={inviteCandidates}
+        pendingInviteUserIds={pendingInviteUserIds}
       />
     </div>
   )
