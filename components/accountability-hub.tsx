@@ -18,12 +18,15 @@ import {
   UserPlus,
   Crown,
   Download,
+  Search,
+  Loader2,
 } from 'lucide-react';
 import Image from 'next/image';
 import { createClient } from '@/utils/supabase/client';
-import { createCommitment, updateCommitmentStatus, leaveGroup, updateRhythmConfig, saveReflection, updateCommitment, updateGroup, removeMember, transferOwnership } from '@/app/accountability/actions';
+import { createCommitment, updateCommitmentStatus, leaveGroup, updateRhythmConfig, saveReflection, updateCommitment, updateGroup, removeMember, transferOwnership, sendGroupInvitation } from '@/app/accountability/actions';
 import { showToast, ToastContainer } from '@/components/toast';
 import { generateGoogleCalendarUrls, generateICSFile, downloadICSFile } from '@/utils/calendar-helpers';
+import { filterInviteCandidates, InviteCandidate } from '@/utils/invite-filter';
 
 // --- TypeScript Interfaces ---
 interface GroupMember {
@@ -80,6 +83,8 @@ interface AccountabilityHubProps {
   commitments: Commitment[];
   reflections: Reflection[];
   currentUserId: string;
+  inviteCandidates?: InviteCandidate[];
+  pendingInviteUserIds?: string[];
 }
 
 // --- Reusable Sub-Components ---
@@ -166,7 +171,7 @@ const HARD_QUESTIONS = [
 
 // --- Main Hub Component ---
 
-export default function AccountabilityHub({ group, members, commitments: initialCommitments, reflections, currentUserId }: AccountabilityHubProps) {
+export default function AccountabilityHub({ group, members, commitments: initialCommitments, reflections, currentUserId, inviteCandidates = [], pendingInviteUserIds = [] }: AccountabilityHubProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, rhythm, debrief
   const [commitments, setCommitments] = useState(initialCommitments);
@@ -201,6 +206,9 @@ export default function AccountabilityHub({ group, members, commitments: initial
 
   // Member management state
   const [showMemberModal, setShowMemberModal] = useState(false);
+  const [inviteSearch, setInviteSearch] = useState('');
+  const [invitingUserId, setInvitingUserId] = useState<string | null>(null);
+  const [sentInviteUserIds, setSentInviteUserIds] = useState<Set<string>>(new Set());
 
   // Edit target modal state
   const [showEditTargetModal, setShowEditTargetModal] = useState(false);
@@ -446,6 +454,30 @@ export default function AccountabilityHub({ group, members, commitments: initial
       showToast(error instanceof Error ? error.message : 'Failed to transfer ownership', 'error');
     }
   };
+
+  const handleInviteUser = async (candidate: InviteCandidate) => {
+    if (invitingUserId) return;
+    setInvitingUserId(candidate.user_id);
+    try {
+      const result = await sendGroupInvitation(candidate.user_id, group.id);
+      if (result.error) {
+        showToast(result.error, 'error');
+      } else {
+        setSentInviteUserIds(prev => new Set(prev).add(candidate.user_id));
+        showToast(`Invitation sent to ${candidate.full_name || 'member'}!`, 'success');
+        router.refresh();
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to send invitation', 'error');
+    } finally {
+      setInvitingUserId(null);
+    }
+  };
+
+  const inviteResults = useMemo(
+    () => filterInviteCandidates(inviteCandidates, inviteSearch, members.map(m => m.user_id)),
+    [inviteCandidates, inviteSearch, members]
+  );
 
   const activeCommitments = useMemo(
     () => commitments.filter(c => c.status === 'active'),
@@ -993,7 +1025,7 @@ export default function AccountabilityHub({ group, members, commitments: initial
                   Group Members
                 </h2>
                 <button
-                  onClick={() => setShowMemberModal(false)}
+                  onClick={() => { setShowMemberModal(false); setInviteSearch(''); }}
                   className="p-2 hover:bg-gray-100 rounded-lg transition"
                 >
                   <X className="w-5 h-5" />
@@ -1056,6 +1088,71 @@ export default function AccountabilityHub({ group, members, commitments: initial
               </div>
 
               <div className="p-6 border-t border-gray-200">
+                {group.created_by === currentUserId && (
+                  <div className="mb-4">
+                    <label htmlFor="invite-search" className="block text-sm font-medium text-gray-700 mb-2">
+                      Invite Members
+                    </label>
+                    <div className="relative">
+                      <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        id="invite-search"
+                        type="text"
+                        value={inviteSearch}
+                        onChange={(e) => setInviteSearch(e.target.value)}
+                        placeholder="Search members by name..."
+                        className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                    {inviteSearch.trim() && (
+                      <div className="mt-2 max-h-48 overflow-y-auto space-y-2">
+                        {inviteResults.length === 0 ? (
+                          <p className="text-sm text-gray-500 py-2">No matching members found.</p>
+                        ) : (
+                          inviteResults.map((candidate) => {
+                            const isPending = pendingInviteUserIds.includes(candidate.user_id) || sentInviteUserIds.has(candidate.user_id);
+                            const isInviting = invitingUserId === candidate.user_id;
+                            return (
+                              <div key={candidate.user_id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                  {candidate.avatar_url ? (
+                                    <Image
+                                      src={candidate.avatar_url}
+                                      alt={candidate.full_name || 'Member'}
+                                      width={32}
+                                      height={32}
+                                      className="w-8 h-8 rounded-full"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                                      {candidate.full_name?.charAt(0) || '?'}
+                                    </div>
+                                  )}
+                                  <span className="text-sm font-medium">{candidate.full_name}</span>
+                                </div>
+                                {isPending ? (
+                                  <span className="text-xs px-3 py-1.5 text-gray-500 flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    Invited
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleInviteUser(candidate)}
+                                    disabled={invitingUserId !== null}
+                                    className="text-xs px-3 py-1.5 border border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition flex items-center gap-1 disabled:opacity-50"
+                                  >
+                                    {isInviting ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
+                                    Invite
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <a
                   href="/directory"
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
