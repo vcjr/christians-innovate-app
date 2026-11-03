@@ -2,9 +2,14 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  // Forward the pathname as a request header so server components can read it
+  // (e.g. NavigationBar uses this to hide itself on auth-only routes)
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', request.nextUrl.pathname)
+
   let response = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: requestHeaders,
     },
   })
 
@@ -26,7 +31,7 @@ export async function middleware(request: NextRequest) {
           // Create a new response to ensure cookies are set in the headers
           response = NextResponse.next({
             request: {
-              headers: request.headers,
+              headers: requestHeaders,
             },
           })
           response.cookies.set({
@@ -40,7 +45,7 @@ export async function middleware(request: NextRequest) {
           request.cookies.delete(name)
           response = NextResponse.next({
             request: {
-              headers: request.headers,
+              headers: requestHeaders,
             },
           })
           response.cookies.delete(name)
@@ -55,15 +60,21 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // 1. Define Route Categories
-  const isPublicRoute = ['/login', '/signup', '/auth', '/forgot-password'].some(path => pathname.startsWith(path));
+  const isPublicAuthPage = ['/login', '/signup', '/forgot-password'].some(path => pathname.startsWith(path));
+  const isPublicRoute = isPublicAuthPage || pathname.startsWith('/auth/confirm');
   const isOnboardingRoute = pathname.startsWith('/onboarding');
   const isSuccessPage = pathname === '/onboarding/success';
-  // Reset password requires a valid session but must bypass the onboarding gate
+  // Reset password requires a valid session (set by exchangeCodeForSession) but bypasses the onboarding gate
   const isResetPasswordRoute = pathname.startsWith('/reset-password');
 
   // 2. Authentication Gate: Redirect to login if no user
-  if (!user && !isPublicRoute && !isResetPasswordRoute) {
+  if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  // 2b. Redirect logged-in users away from auth pages (login, signup, forgot-password)
+  if (user && isPublicAuthPage) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   // 3. Onboarding "Iron Gate" Funnel: Force onboarding if not completed

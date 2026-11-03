@@ -22,14 +22,10 @@ export default async function DayViewPage({
     return redirect('/login')
   }
 
-  // Fetch the day details
+  // Fetch the day details (no nested user_progress — see explicit query below)
   const { data: day, error: dayError } = await supabase
     .from('plan_days')
-    .select(`
-      *,
-      reading_plans(id, title, description),
-      user_progress(is_completed)
-    `)
+    .select(`*, reading_plans(id, title, description)`)
     .eq('id', dayId)
     .single()
 
@@ -49,7 +45,16 @@ export default async function DayViewPage({
     return redirect('/dashboard')
   }
 
-  const isCompleted = day.user_progress?.[0]?.is_completed || false
+  // Fetch this user's progress explicitly — never use nested relationship syntax
+  // because it relies on RLS alone and can expose another user's completed state.
+  const { data: progressRow } = await supabase
+    .from('user_progress')
+    .select('is_completed')
+    .eq('user_id', user.id)
+    .eq('day_id', dayId)
+    .maybeSingle()
+
+  const isCompleted = progressRow?.is_completed || false
 
   // Fetch sibling days and total count for navigation
   const planId = day.reading_plans?.id

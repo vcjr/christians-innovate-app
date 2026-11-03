@@ -20,7 +20,11 @@ export async function completeOnboardingAction(data: Partial<UserProfile>) {
   }
 
   // 2. Data Sanitization & Validation
-  const sanitizedData = sanitizeProfileData(data);
+  const payloadToSanitize = { ...data };
+  if (!payloadToSanitize.full_name?.trim()) {
+    delete payloadToSanitize.full_name;
+  }
+  const sanitizedData = sanitizeProfileData(payloadToSanitize);
   const urlError = validateUrls(data);
   if (urlError) return { data: null, error: urlError };
 

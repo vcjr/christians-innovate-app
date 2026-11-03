@@ -44,10 +44,12 @@ export async function signup(formData: FormData) {
 
     // Sign up the user - the handle_new_user trigger will auto-create the profile
     console.log('Attempting to sign up user with email:', email)
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://app.christiansinnovate.com'
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: `${siteUrl}/auth/confirm?type=signup`,
         data: {
           full_name: name,
           ci_updates: ciUpdates,

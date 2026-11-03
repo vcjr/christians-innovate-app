@@ -11,9 +11,10 @@ describe('useProfile Hook', () => {
     jest.clearAllMocks();
   });
 
-  it('should initialize with empty profile data', () => {
+  it('should initialize with empty profile data without full_name', () => {
     const { result } = renderHook(() => useProfile());
     expect(result.current.profile.bio).toBeDefined();
+    expect(result.current.profile.full_name).toBeUndefined();
   });
 
   it('should update local state without calling server', () => {

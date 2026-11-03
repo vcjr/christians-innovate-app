@@ -9,7 +9,7 @@ export async function requestPasswordReset(formData: FormData): Promise<{ messag
   const supabase = await createClient()
 
   await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl}/auth/confirm`,
+    redirectTo: `${siteUrl}/auth/confirm?type=recovery`,
   })
 
   // Always return success — never reveal whether the email exists

@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -6,7 +7,17 @@ import { MobileMenu } from './mobile-menu'
 import { UserProfileDropdown } from './user-profile-dropdown'
 import { NotificationBell } from './notification-bell'
 
+// Routes where the nav should never render, even for authenticated users
+const NAV_HIDDEN_ROUTES = ['/reset-password', '/onboarding']
+
 export async function NavigationBar() {
+  const headersList = await headers()
+  const pathname = headersList.get('x-pathname') || ''
+
+  if (NAV_HIDDEN_ROUTES.some(route => pathname.startsWith(route))) {
+    return null
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
