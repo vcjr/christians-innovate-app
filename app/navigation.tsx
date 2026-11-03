@@ -3,7 +3,6 @@ import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import Image from 'next/image'
 import { LayoutDashboard, Users, Rocket, FolderOpen, Target } from 'lucide-react'
-import { MobileMenu } from './mobile-menu'
 import { UserProfileDropdown } from './user-profile-dropdown'
 import { NotificationBell } from './notification-bell'
 
@@ -56,7 +55,7 @@ export async function NavigationBar() {
     .eq('is_read', false)
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-40">
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-40 hidden md:block">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo and Nav Links */}
@@ -131,9 +130,13 @@ export async function NavigationBar() {
             />
           </div>
 
-          {/* Mobile Menu */}
+          {/* Mobile - Show user profile only */}
           <div className="md:hidden">
-            <MobileMenu userEmail={user.email || ''} isAdmin={isAdmin} />
+            <UserProfileDropdown
+              fullName={userProfile?.full_name || null}
+              avatarUrl={userProfile?.avatar_url || null}
+              userId={user.id}
+            />
           </div>
         </div>
       </div>

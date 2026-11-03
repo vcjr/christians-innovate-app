@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { SettingsForm } from './settings-form'
+import { ProfileForm } from './profile-form'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
@@ -32,36 +32,36 @@ export default async function SettingsPage() {
           Back to Dashboard
         </Link>
 
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Settings</h1>
-          <p className="text-gray-600 mt-2">Manage your profile and preferences</p>
-        </div>
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Profile Settings</h1>
+        <p className="text-gray-600 mt-2">Manage your personal information and social links</p>
+      </div>
 
-        {/* Settings Form */}
-        <SettingsForm
-          user={user}
-          profile={profile || {
-            id: user.id,
-            full_name: user.user_metadata?.full_name || null,
-            avatar_url: null,
-            ci_updates: false,
-            bible_year: false,
-            skill_share: false,
-            referral: null,
-            skills: [],
-            interests: [],
-            looking_for_business_partner: false,
-            looking_for_accountability_partner: false,
-            bio: null,
-            linkedin_url: null,
-            facebook_url: null,
-            twitter_url: null,
-            website_url: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }}
-        />
+      {/* Profile Form */}
+      <ProfileForm
+        user={user}
+        profile={profile || {
+          id: user.id,
+          full_name: user.user_metadata?.full_name || null,
+          avatar_url: null,
+          ci_updates: false,
+          bible_year: false,
+          skill_share: false,
+          referral: null,
+          skills: [],
+          interests: [],
+          looking_for_business_partner: false,
+          looking_for_accountability_partner: false,
+          bio: null,
+          linkedin_url: null,
+          facebook_url: null,
+          twitter_url: null,
+          website_url: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }}
+      />
       </div>
     </div>
   )

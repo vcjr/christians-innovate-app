@@ -14,8 +14,10 @@
     "release": "release-it"
   },
   "dependencies": {
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
+    "clsx": "^2.1.1",
     "canvas-confetti": "^1.9.3",
     "js-cookie": "^3.0.5",
     "@tiptap/extension-color": "^3.20.0",
@@ -29,6 +31,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
+    "tailwind-merge": "^3.4.0",
     "resend": "^6.9.2"
   },
   "devDependencies": {
@@ -44,6 +47,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/serviceworker": "^0.0.186",
     "core-js": "^3.48.0",
     "dotenv": "^16.4.7",
     "eslint": "^9",
