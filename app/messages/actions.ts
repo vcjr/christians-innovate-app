@@ -63,7 +63,7 @@ export async function sendMessageRequest(otherUserId: string) {
 
   const senderName = senderProfile?.full_name || 'Someone'
 
-  const { error: notifError } = await supabase.rpc('create_notification_for_user', {
+  const { error: notificationError } = await supabase.rpc('create_notification_for_user', {
     p_user_id: otherUserId,
     p_type: 'message_request',
     p_title: `${senderName} wants to connect`,
@@ -72,8 +72,15 @@ export async function sendMessageRequest(otherUserId: string) {
     p_reference_id: conv.id,
   })
 
-  if (notifError) {
-    console.error('sendMessageRequest: failed to notify recipient:', notifError)
+  if (notificationError) {
+    console.error('Failed to notify recipient of message request:', notificationError)
+    const { error: cleanupError } = await supabase.rpc('decline_message_request', {
+      p_conversation_id: conv.id,
+    })
+    if (cleanupError) {
+      console.error('Failed to clean up unnotified message request:', cleanupError)
+    }
+    throw new Error('Failed to notify recipient of message request')
   }
 
   redirect(`/messages/${conv.id}`)
@@ -167,7 +174,7 @@ export async function sendMessage(conversationId: string, content: string) {
   }
 
   const preview = trimmed.length > 100 ? trimmed.slice(0, 97) + '…' : trimmed
-  const { error: updateError } = await supabase
+  const { error: previewError } = await supabase
     .from('conversations')
     .update({
       last_message_at: new Date().toISOString(),
@@ -175,8 +182,8 @@ export async function sendMessage(conversationId: string, content: string) {
       last_message_sender_id: user.id,
     })
     .eq('id', conversationId)
-  if (updateError) {
-    console.error('sendMessage: failed to update conversation preview:', updateError)
+  if (previewError) {
+    console.error('Message sent, but failed to update conversation preview:', previewError)
   }
 
   const recipientId = conversation.participant_1 === user.id

@@ -116,17 +116,28 @@ export function MessageThread({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const previousMessagesRef = useRef<Message[] | null>(null)
+  const isNearBottomRef = useRef(true)
   const [hasMore, setHasMore] = useState(initialHasMore)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  // Scroll to bottom only when new messages are appended (not when older messages are prepended)
+  // Scroll to bottom on new messages
   useEffect(() => {
-    if (loadingMore) return
     const container = messagesContainerRef.current
-    if (container) {
+    const previousMessages = previousMessagesRef.current
+    previousMessagesRef.current = messages
+    if (!container) return
+
+    const isInitialLoad = previousMessages === null
+    const isAppend = previousMessages !== null &&
+      messages.length > previousMessages.length &&
+      (previousMessages.length === 0 || messages[0]?.id === previousMessages[0]?.id)
+
+    if (isInitialLoad || (isAppend && isNearBottomRef.current)) {
       container.scrollTop = container.scrollHeight
+      isNearBottomRef.current = true
     }
-  }, [messages, loadingMore])
+  }, [messages])
 
   // Real-time subscription for incoming messages and read receipts
   useEffect(() => {
@@ -274,8 +285,9 @@ export function MessageThread({
           container.scrollTop = scrollHeightAfter - scrollHeightBefore
         }
       })
-    } catch (err) {
-      console.error('Failed to load earlier messages:', err)
+    } catch (loadError) {
+      console.error('Failed to load earlier messages:', loadError)
+      setError('Failed to load earlier messages')
     } finally {
       setLoadingMore(false)
     }
@@ -321,6 +333,10 @@ export function MessageThread({
       {/* Messages */}
       <div
         ref={messagesContainerRef}
+        onScroll={(event) => {
+          const container = event.currentTarget
+          isNearBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+        }}
         role="log"
         aria-live="polite"
         aria-label={`Conversation with ${otherUser.full_name || 'user'}`}

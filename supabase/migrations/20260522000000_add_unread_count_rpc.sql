@@ -8,6 +8,8 @@ CREATE OR REPLACE FUNCTION public.get_unread_message_counts()
 RETURNS TABLE(conversation_id UUID, unread_count BIGINT)
 LANGUAGE SQL
 STABLE
+SECURITY INVOKER
+SET search_path = public, pg_temp
 AS $$
   SELECT m.conversation_id, COUNT(*) AS unread_count
   FROM public.messages m
@@ -17,3 +19,6 @@ AS $$
     AND m.sender_id <> auth.uid()
   GROUP BY m.conversation_id;
 $$;
+
+REVOKE ALL ON FUNCTION public.get_unread_message_counts() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_unread_message_counts() TO authenticated;
