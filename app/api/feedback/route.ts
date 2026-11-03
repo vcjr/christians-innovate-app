@@ -10,6 +10,7 @@ const WINDOW_MS = 15 * 60 * 1000
 const MAX_REQUESTS = 5
 const store = new Map<string, number[]>()
 
+/** Records an attempt for the given key and returns whether it is within the current window. */
 function checkRateLimit(key: string): { allowed: boolean; retryAfterMs: number } {
   const now = Date.now()
   const cutoff = now - WINDOW_MS
@@ -28,6 +29,7 @@ function checkRateLimit(key: string): { allowed: boolean; retryAfterMs: number }
 
 const VALID_TYPES = ['bug', 'feature', 'general']
 
+/** Validates and stores a feedback submission, subject to the best-effort IP rate limit. */
 export async function POST(request: NextRequest) {
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

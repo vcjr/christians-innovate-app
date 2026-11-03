@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { MessageSquareMore, X, Bug, Lightbulb, MessageCircle, Send, CheckCircle2, ImagePlus, Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
+/** Checks whether a preview URL uses the blob scheme. */
 function isSafeBlobUrl(url: string | null): url is string {
   return typeof url === 'string' && /^blob:/.test(url)
 }
@@ -27,6 +28,7 @@ interface FeedbackButtonProps {
   appSlug?: string
 }
 
+/** Renders the feedback launcher and opens the form with its optional user and app context. */
 export function FeedbackButton({ userId, appSlug }: FeedbackButtonProps) {
   const [open, setOpen] = useState(false)
 
@@ -52,6 +54,7 @@ export function FeedbackButton({ userId, appSlug }: FeedbackButtonProps) {
   )
 }
 
+/** Collects feedback and optionally uploads a screenshot before submitting it. */
 function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; userId?: string; appSlug?: string }) {
   const [type, setType] = useState('bug')
   const [subject, setSubject] = useState('')
@@ -108,6 +111,7 @@ function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; user
     }
   }, [screenshotPreview])
 
+  /** Replaces the selected screenshot and its local preview URL. */
   function handleScreenshot(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] || null
     if (screenshotPreview) URL.revokeObjectURL(screenshotPreview)
@@ -115,6 +119,7 @@ function FeedbackModal({ onClose, userId, appSlug }: { onClose: () => void; user
     setScreenshotPreview(file ? URL.createObjectURL(file) : null)
   }
 
+  /** Clears the selected screenshot and revokes its local preview URL. */
   function removeScreenshot() {
     if (screenshotPreview) URL.revokeObjectURL(screenshotPreview)
     setScreenshot(null)

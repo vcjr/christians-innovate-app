@@ -38,6 +38,7 @@ export const metadata: Metadata = {
   },
 };
 
+/** Renders the application shell and shows authenticated user chrome where appropriate. */
 export default async function RootLayout({
   children,
 }: Readonly<{
