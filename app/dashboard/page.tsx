@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { ensureDefaultPlanSubscription } from '@/lib/reading-plans'
 import { redirect } from 'next/navigation'
 import { unsubscribeFromPlan, getAllCalendarDays, getPlanDays } from './actions'
 import { SubscribeButton } from './subscribe-button'
@@ -44,7 +45,15 @@ export default async function Dashboard({
     console.error('Failed to fetch userprofile', userProfileError)
   }
 
-  const subscribedPlanIds = subscriptions?.map(s => s.plan_id) || []
+  const subscribedPlanIds: string[] = subscriptions?.map(s => s.plan_id) || []
+
+  // Auto-enroll users who opted into the Bible reading plan but have no subscription yet
+  if (!subscriptionsError && subscribedPlanIds.length === 0 && userProfile?.bible_year === true) {
+    const autoSubscribedPlanId = await ensureDefaultPlanSubscription(supabase, user.id)
+    if (autoSubscribedPlanId) {
+      subscribedPlanIds.push(autoSubscribedPlanId)
+    }
+  }
 
   // Get user's accountability group status (use first group for the dashboard widget)
   let accountabilityStats = null
