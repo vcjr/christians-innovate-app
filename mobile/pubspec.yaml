@@ -1,0 +1,64 @@
+name: ci_mobile
+description: "Christians Innovate for iOS and Android: daily reading, the Bible, prayer wall and accountability groups."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_markdown_plus: ^1.0.12
+  flutter_riverpod: ^3.4.3
+  flutter_secure_storage: ^11.2.0
+  go_router: ^18.1.2
+  http: ^1.6.0
+  image_picker: ^1.2.4
+  intl: ^0.20.3
+  path_provider: ^2.1.6
+  share_plus: ^13.3.1
+  shared_preferences: ^2.5.6
+  supabase_flutter: ^2.18.3
+  url_launcher: ^6.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter
+  path_provider_platform_interface: ^2.1.3
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-400.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-500.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-600.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-700.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSans-800.ttf
+          weight: 800
+    - family: Literata
+      fonts:
+        - asset: assets/fonts/Literata-400.ttf
+          weight: 400
+        - asset: assets/fonts/Literata-500.ttf
+          weight: 500
+        - asset: assets/fonts/Literata-600.ttf
+          weight: 600
+        - asset: assets/fonts/Literata-Italic-400.ttf
+          weight: 400
+          style: italic
+    - family: LiterataDisplay
+      fonts:
+        - asset: assets/fonts/LiterataDisplay-600.ttf
+          weight: 600
