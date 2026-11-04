@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/* Brand tokens, carried over from the Lovable site: sky blue from the logo, a warm gold, paper white. */
+@theme {
+  --color-paper: #fbfbf8;
+  --color-ink: #1d2330;
+  --color-muted: #5f6878;
+  --color-line: #dde0e6;
+  --color-brand: #0074b8;
+  --color-brand-deep: #005a90;
+  --color-brand-soft: #e8f3fa;
+  --color-gold: #f2b134;
+  --color-gold-soft: #fdf3dc;
+  --color-hope: #2db88a;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-playfair), ui-serif, Georgia, serif;
+
+  --shadow-card: 0 10px 40px -10px rgb(29 35 48 / 0.1);
+  --shadow-soft: 0 4px 20px -4px rgb(0 116 184 / 0.15);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

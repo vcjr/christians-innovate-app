@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The marketing site and the Flutter app lint themselves.
+    "site/**",
+    "mobile/**",
   ]),
 ]);
 
