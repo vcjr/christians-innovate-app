@@ -109,11 +109,15 @@ class SyncState {
 
 /// A failure worth showing to the member, in plain words.
 class BackendException implements Exception {
-  const BackendException(this.message, {this.offline = false});
+  const BackendException(this.message, {this.offline = false, this.temporary = false});
   final String message;
 
   /// The server couldn't be reached, as opposed to refusing the request.
   final bool offline;
+
+  /// The server failed in passing (overloaded, restarting, session refreshing) rather than
+  /// rejecting the request, so the same request may well work later.
+  final bool temporary;
 
   static const unreachable = BackendException('You’re offline. This needs a connection.', offline: true);
 

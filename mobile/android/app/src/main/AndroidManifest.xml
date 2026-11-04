@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds need this too: everything comes from Supabase. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="ci_mobile"
         android:name="${applicationName}"

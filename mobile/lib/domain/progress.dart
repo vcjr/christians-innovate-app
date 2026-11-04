@@ -21,7 +21,8 @@ PlanDay? todaysReading(List<PlanDay> days, DateTime now) {
 int readingStreak(Iterable<DateTime> completedAt, DateTime now) {
   final days = {for (final c in completedAt) _day(c)};
   var cursor = _day(now);
-  if (!days.contains(cursor)) cursor = cursor.subtract(const Duration(days: 1));
+  // By calendar date, not 24 hours: across a daylight-saving change those differ.
+  if (!days.contains(cursor)) cursor = DateTime(cursor.year, cursor.month, cursor.day - 1);
   var streak = 0;
   while (days.contains(cursor)) {
     streak++;

@@ -97,7 +97,7 @@ class _PhotoPickerState extends ConsumerState<PhotoPicker> {
   bool _busy = false;
 
   Future<void> _pick() async {
-    final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 85);
+    final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 85, requestFullMetadata: false);
     if (file == null || !mounted) return;
     setState(() => _busy = true);
     final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'jpg';

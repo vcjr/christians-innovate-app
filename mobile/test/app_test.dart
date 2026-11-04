@@ -54,6 +54,13 @@ void main() {
     expect(find.text('Genesis 2'), findsOneWidget, reason: 'a heading per passage when the day lists several');
     expect(find.text('Psalms 2'), findsOneWidget);
 
+    // Tapping a verse selects it and offers Copy and Share.
+    await tester.tap(find.textContaining('First verse of Genesis 2', findRichText: true));
+    await tester.pumpAndSettle();
+    expect(find.text('Share'), findsOneWidget);
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+
     await tester.scrollUntilVisible(find.byKey(const Key('mark-read')), 300, scrollable: find.byType(Scrollable).last);
 
     // A quick tap only explains that it needs holding.

@@ -84,6 +84,13 @@ void main() {
       expect(readingStreak([DateTime(2026, 10, 30)], now), 0);
     });
 
+    test('steps back by calendar day across a daylight-saving change', () {
+      // Run with TZ=America/New_York to exercise it: clocks went back on November 1, 2026, so
+      // November 2 at midnight minus 24 hours is 1am on November 1, not midnight.
+      final now = DateTime(2026, 11, 2, 9);
+      expect(readingStreak([DateTime(2026, 11, 1, 8), DateTime(2026, 10, 31, 8)], now), 2);
+    });
+
     test('crosses month ends', () {
       expect(readingStreak([DateTime(2026, 11, 1), DateTime(2026, 10, 31), DateTime(2026, 10, 30)], DateTime(2026, 11, 1, 12)), 3);
     });

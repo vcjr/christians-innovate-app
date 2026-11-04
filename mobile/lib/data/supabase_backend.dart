@@ -110,14 +110,27 @@ class SupabaseBackend implements Backend {
       }
       _setOffline(false);
       throw switch (e) {
-        AuthException() => BackendException(_authMessage(e)),
+        AuthException() => BackendException(_authMessage(e), temporary: true),
         PostgrestException(:final code) => BackendException(
           code == '23505' ? 'That’s already been done.' : 'Something went wrong. Try again.',
+          temporary: _isTemporary(code),
         ),
         StorageException() => const BackendException('The upload didn’t go through. Try again.'),
         _ => const BackendException('Something went wrong. Try again.'),
       };
     }
+  }
+
+  /// Server faults that say nothing about the request itself: an HTTP 5xx from the gateway,
+  /// PostgREST losing its database connection, or Postgres being busy, short of resources,
+  /// shutting down or resolving a conflict.
+  static bool _isTemporary(String? code) {
+    if (code == null) return false;
+    return RegExp(r'^5\d\d$').hasMatch(code) ||
+        {'PGRST000', 'PGRST001', 'PGRST002', 'PGRST003', '40001', '40P01', '55P03'}.contains(code) ||
+        code.startsWith('08') ||
+        code.startsWith('53') ||
+        code.startsWith('57');
   }
 
   /// How long a screen waits on the network before showing what's saved instead.
@@ -138,7 +151,7 @@ class SupabaseBackend implements Backend {
       }
     }
     final fresh = _run(fetch).then((raw) {
-      unawaited(_store.put(key, raw));
+      _store.put(key, raw).ignore(); // Only a cache; the screen still gets the fresh rows.
       return raw;
     });
     fresh.ignore(); // Its error is handled below, or it's no longer wanted after a timeout.
@@ -1081,7 +1094,7 @@ class SupabaseBackend implements Backend {
         // Nothing to send; just see whether the server answers.
         if (_offline) await _run(() => _db.from('reading_plans').select('id').limit(1));
       } else {
-        await _outbox.flush((c) => _run(() => _send(c)), (e) => e is BackendException && e.offline);
+        await _outbox.flush((c) => _run(() => _send(c)), (e) => e is BackendException && (e.offline || e.temporary));
       }
     } on BackendException {
       // Still offline; the probe tries again.

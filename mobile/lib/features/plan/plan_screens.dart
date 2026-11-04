@@ -213,12 +213,14 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
     setState(() => _busy = true);
     final ok = await runAction(context, () async {
       if (widget.following) return backend.unsubscribe(widget.plan.id);
+      // Start the new plan before stopping the old ones, so a failure never leaves no plan at all.
+      await backend.subscribe(widget.plan.id);
       for (final id in others) {
         await backend.unsubscribe(id);
       }
-      await backend.subscribe(widget.plan.id);
     }, done: widget.following ? 'You’ve stopped following ${widget.plan.title}' : 'You’re following ${widget.plan.title}');
-    if (ok) ref.invalidate(subscribedPlanIdsProvider);
+    // Refresh even after a failure: part of the switch may have gone through.
+    ref.invalidate(subscribedPlanIdsProvider);
     if (mounted) setState(() => _busy = false);
     if (ok && !widget.following && mounted) context.go('/today');
   }

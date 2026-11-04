@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:ci_mobile/data/backend.dart';
@@ -54,6 +55,15 @@ void main() {
       final reopened = await OfflineStore.open();
       expect(await reopened.keys(''), {'u/other/posts', 'translation/ESV'});
     });
+
+    test('a failed write reaches the caller, and later writes still run', () async {
+      File('${tmp.path}/offline').writeAsStringSync('in the way'); // the folder can't be made
+      final s = await OfflineStore.open();
+      await expectLater(s.put('u/me/outbox', [1]), throwsA(isA<FileSystemException>()));
+      File('${tmp.path}/offline').deleteSync();
+      await s.put('u/me/outbox', [2]);
+      expect(await (await OfflineStore.open()).get('u/me/outbox'), [2]);
+    });
   });
 
   group('Outbox', () {
@@ -96,6 +106,31 @@ void main() {
       }, isOffline);
       expect(done, isTrue);
       expect(sent, [2]);
+    });
+
+    test('a passing server fault keeps the change for the next try', () async {
+      final box = Outbox(OfflineStore.memory());
+      await box.load('me');
+      await box.add({'n': 1});
+      const busy = BackendException('Something went wrong.', temporary: true);
+      final done = await box.flush((c) async => throw busy, (e) => e is BackendException && (e.offline || e.temporary));
+      expect(done, isFalse);
+      expect(box.length, 1);
+    });
+
+    test('a change added while the queue is still loading isn’t lost', () async {
+      final store = OfflineStore.memory();
+      await store.put('u/me/outbox', [
+        {'n': 1},
+      ]);
+      final box = Outbox(store);
+      // Startup: the auth listener, a screen's read and a write all load at once.
+      unawaited(box.load('me'));
+      unawaited(box.load('me'));
+      await box.add({'n': 2});
+      final sent = <int>[];
+      await box.flush((c) async => sent.add(c['n'] as int), isOffline);
+      expect(sent, [1, 2]);
     });
 
     test('each member has their own queue', () async {

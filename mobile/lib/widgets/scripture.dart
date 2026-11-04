@@ -111,7 +111,6 @@ class _ScriptureViewState extends ConsumerState<ScriptureView> {
       final selected = _selected.contains(v);
       spans.add(
         TextSpan(
-          recognizer: r,
           style: selected
               ? TextStyle(
                   backgroundColor: p.highlight,
@@ -128,7 +127,8 @@ class _ScriptureViewState extends ConsumerState<ScriptureView> {
                 child: Text('${v.number}', style: number),
               ),
             ),
-            TextSpan(text: '${v.text} '),
+            // The recognizer goes on the span with the text: a tap reaches only the innermost span.
+            TextSpan(text: '${v.text} ', recognizer: r),
           ],
         ),
       );
@@ -159,10 +159,21 @@ class _ScriptureViewState extends ConsumerState<ScriptureView> {
                           showToast(context, 'Copied');
                         },
                       ),
-                      ActionChip(
-                        avatar: const Icon(Icons.ios_share_rounded, size: 16),
-                        label: const Text('Share'),
-                        onPressed: () => SharePlus.instance.share(ShareParams(text: _selectionText(translation))),
+                      Builder(
+                        builder: (chip) => ActionChip(
+                          avatar: const Icon(Icons.ios_share_rounded, size: 16),
+                          label: const Text('Share'),
+                          onPressed: () {
+                            // iPad shows the share sheet as a popover, which needs something to point at.
+                            final box = chip.findRenderObject() as RenderBox?;
+                            SharePlus.instance.share(
+                              ShareParams(
+                                text: _selectionText(translation),
+                                sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+                              ),
+                            );
+                          },
+                        ),
                       ),
                       ActionChip(label: const Text('Clear'), onPressed: () => setState(_selected.clear)),
                     ],

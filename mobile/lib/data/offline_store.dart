@@ -52,27 +52,31 @@ class OfflineStore {
     final dir = _dir;
     if (dir == null) return Future.value();
     final text = jsonEncode(value);
-    return _writes = _writes
-        .then((_) async {
-          await dir.create(recursive: true);
-          // Write beside it and swap in, so a crash never leaves a torn file under the real name.
-          final tmp = File('${_file(key).path}.tmp');
-          await tmp.writeAsString(text, flush: true);
-          await tmp.rename(_file(key).path);
-        })
-        .catchError((Object _) {});
+    return _queue(() async {
+      await dir.create(recursive: true);
+      // Write beside it and swap in, so a crash never leaves a torn file under the real name.
+      final tmp = File('${_file(key).path}.tmp');
+      await tmp.writeAsString(text, flush: true);
+      await tmp.rename(_file(key).path);
+    });
   }
 
   Future<void> remove(String key) {
     _memory.remove(key);
     final dir = _dir;
     if (dir == null) return Future.value();
-    return _writes = _writes
-        .then((_) async {
-          final f = _file(key);
-          if (await f.exists()) await f.delete();
-        })
-        .catchError((Object _) {});
+    return _queue(() async {
+      final f = _file(key);
+      if (await f.exists()) await f.delete();
+    });
+  }
+
+  /// Runs [write] after the writes before it. A failure (a full disk, say) reaches the caller,
+  /// but doesn't stop the writes after it.
+  Future<void> _queue(Future<void> Function() write) {
+    final next = _writes.then((_) => write());
+    _writes = next.catchError((Object _) {});
+    return next;
   }
 
   /// Every stored key that starts with [prefix].
