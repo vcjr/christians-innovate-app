@@ -106,7 +106,8 @@ const config: Config = {
   },
 
   // An array of regexp pattern strings, matched against all module paths before considered 'visible' to the module loader
-  // modulePathIgnorePatterns: [],
+  // The marketing site and the Flutter app are separate projects.
+  modulePathIgnorePatterns: ['<rootDir>/site/', '<rootDir>/mobile/'],
 
   // Activates notifications for test results
   // notify: false,
