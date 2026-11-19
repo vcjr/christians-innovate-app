@@ -1,4 +1,5 @@
 import { UserProfile } from '@/types/profile';
+import { URL_FIELDS, normalizeUrl } from '@/utils/validation';
 
 /**
  * @function sanitizeProfileData
@@ -17,6 +18,13 @@ export function sanitizeProfileData(data: Partial<UserProfile>): Partial<UserPro
 
   if (data.bio !== undefined) {
     sanitized.bio = data.bio?.trim() || null;
+  }
+
+  for (const field of URL_FIELDS) {
+    const val = data[field];
+    if (typeof val === 'string') {
+      (sanitized as Record<string, unknown>)[field] = normalizeUrl(val);
+    }
   }
 
   return sanitized;

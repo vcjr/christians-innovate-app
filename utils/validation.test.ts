@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { validateUrls } from './validation';
+import { validateUrls, normalizeUrl } from './validation';
 
 describe('validateUrls Utility', () => {
   it('returns null for valid URLs', () => {
@@ -23,5 +23,15 @@ describe('validateUrls Utility', () => {
       linkedin_url: 'invalid' 
     };
     expect(validateUrls(data)).toContain('linkedin_url');
+  });
+});
+describe('normalizeUrl Utility', () => {
+  it('prepends https:// to scheme-less URLs and accepts them in validateUrls', () => {
+    expect(normalizeUrl(' example.com ')).toBe('https://example.com');
+    expect(validateUrls({ website_url: 'example.com' })).toBeNull();
+  });
+
+  it('returns null for blank input', () => {
+    expect(normalizeUrl('   ')).toBeNull();
   });
 });
