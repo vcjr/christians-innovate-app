@@ -7,6 +7,7 @@ import { MobileMenu } from './mobile-menu'
 import { UserProfileDropdown } from './user-profile-dropdown'
 import { NotificationBell } from './notification-bell'
 import { NavDropdown } from './nav-dropdown'
+import { MessageCountRefresh } from './message-count-refresh'
 
 // Routes where the nav should never render, even for authenticated users
 const NAV_HIDDEN_ROUTES = ['/reset-password', '/onboarding']
@@ -67,6 +68,7 @@ export async function NavigationBar() {
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      <MessageCountRefresh userId={user.id} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo and Nav Links */}

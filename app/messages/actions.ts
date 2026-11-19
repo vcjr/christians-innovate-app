@@ -164,9 +164,11 @@ export async function sendMessage(conversationId: string, content: string) {
     return { error: 'Cannot send messages until the request is accepted' }
   }
 
-  const { error: msgError } = await supabase
+  const { data: message, error: msgError } = await supabase
     .from('messages')
     .insert({ conversation_id: conversationId, sender_id: user.id, content: trimmed })
+    .select('id, sender_id, content, is_read, created_at')
+    .single()
 
   if (msgError) {
     console.error('Error sending message:', msgError)
@@ -207,7 +209,7 @@ export async function sendMessage(conversationId: string, content: string) {
   })
 
   revalidatePath(`/messages/${conversationId}`)
-  return { success: true }
+  return { success: true, message }
 }
 
 // ============================================================

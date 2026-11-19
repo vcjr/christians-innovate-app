@@ -19,6 +19,7 @@ interface NavDropdownProps {
 export function NavDropdown({ label, icon, items }: NavDropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const menuId = useId()
 
   useEffect(() => {
@@ -28,7 +29,8 @@ export function NavDropdown({ label, icon, items }: NavDropdownProps) {
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && open) {
+        triggerRef.current?.focus()
         setOpen(false)
       }
     }
@@ -38,14 +40,14 @@ export function NavDropdown({ label, icon, items }: NavDropdownProps) {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [])
+  }, [open])
 
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
-        aria-haspopup="menu"
         aria-controls={menuId}
         className="flex items-center gap-1.5 text-gray-600 hover:text-gray-900 font-medium transition"
       >
@@ -56,7 +58,6 @@ export function NavDropdown({ label, icon, items }: NavDropdownProps) {
 
       <div
         id={menuId}
-        role="menu"
         hidden={!open}
         className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg border border-gray-200 shadow-lg py-1 z-50"
       >
@@ -64,7 +65,6 @@ export function NavDropdown({ label, icon, items }: NavDropdownProps) {
           <Link
             key={item.href}
             href={item.href}
-            role="menuitem"
             onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition"
           >

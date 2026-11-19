@@ -251,6 +251,14 @@ export function MessageThread({
         // Roll back optimistic message on error
         setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id))
         setDraft(content)
+      } else if (result.message) {
+        const savedMessage = result.message
+        setMessages(prev => {
+          if (prev.some(m => m.id === savedMessage.id)) {
+            return prev.filter(m => m.id !== optimisticMsg.id)
+          }
+          return prev.map(m => m.id === optimisticMsg.id ? savedMessage : m)
+        })
       }
     })
   }
